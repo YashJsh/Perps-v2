@@ -6,8 +6,6 @@ const client = redis.createClient({
         url: "redis://localhost:6379"
 });
 
-
-
 const main = async () => {
     await client.connect();
     let engineResponse : EngineResponse = {

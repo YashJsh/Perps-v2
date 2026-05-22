@@ -1,4 +1,4 @@
-import type { EngineRequest, EngineRequestType, EngineResponse } from "types";
+import type { EngineRequest, EngineRequestOptions, EngineResponse } from "types";
 import redis from "redis";
 import { JsonWebTokenError } from "jsonwebtoken";
 
@@ -21,7 +21,7 @@ const subscriberClient = redis.createClient({
 await publisherClient.connect();
 await subscriberClient.connect();
 
-export const sendToEngine = async (type: EngineRequestType, payload: Record<string, unknown>) => {
+export const sendToEngine = async (type: EngineRequestOptions, payload: Record<string, unknown>) : Promise<EngineResponse>=> {
     const correlation_id = crypto.randomUUID();
     const message: EngineRequest = {
         correlationId: correlation_id,
@@ -29,18 +29,17 @@ export const sendToEngine = async (type: EngineRequestType, payload: Record<stri
         payload,
     };
 
-    let response_promise = waitForResponse(correlation_id);
+    let response_promise = await waitForResponse(correlation_id);
 
     await publisherClient.xAdd("backend_request", "*", {
         data : JSON.stringify(message)
     })
-    
     return response_promise;
 }
 
-export const waitForResponse = (correlationId : string)=>{
+export const waitForResponse = async (correlationId : string)=>{
     //Otherwise send a timeout for the data.
-    return new Promise((resolve, reject)=>{
+    return new Promise<EngineResponse>((resolve, reject)=>{
         pendingResponse.set(correlationId, {
             resolve,
             reject
