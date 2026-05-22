@@ -1,37 +1,57 @@
 
 import redis from "redis";
-import type{ EngineResponse } from "types";
+import type{ EngineRequest, EngineResponse } from "types";
+import { engineHandlePlease } from "./src/engine/engine";
 
 const client = redis.createClient({
         url: "redis://localhost:6379"
 });
 
+const senderClient = redis.createClient({
+    url : "redis://localhost:6379"
+})
+
+const sendResponse = async (data : unknown)=> {
+    senderClient.xAdd("engine_response", "*", {
+        response : JSON.stringify(data)
+    })
+}
+
 const main = async () => {
     await client.connect();
-    let engineResponse : EngineResponse = {
-        correlationId : "2",
-        ok : true,
-        data : {
-            filled : 12,
-            status : "OrderMatchedSuccessfully"
-        }
-    }
-    client.xAdd("engine_response", "*", {
-        response : JSON.stringify(engineResponse)
-    });
-
-    // while (true) {
-    //     const message = await client.xRead([
-    //         {
-    //             key: "engine_data",
-    //             id: "$"
-    //         },
+    while (true) {
+        const message = await client.xRead([
+            {
+                key: "engine_data",
+                id: "$"
+            },
             
-    //     ], {
-    //         BLOCK : 0
-    //     });
-    //     console.log(message);
-    // }
+        ], {
+            BLOCK : 0
+        });
+        console.log(message);
+        if (!message){
+            continue;
+        }
+        //@ts-ignore
+        let data =  message[0].messages[0].message.response;
+        let parsedData = JSON.parse(data) as EngineRequest;
+        
+        const response_data = engineHandlePlease(parsedData);
+        await sendResponse(response_data);
+    }
 };
-
 main();
+
+
+// let engineResponse : EngineResponse = {
+//         correlationId : "2",
+//         ok : true,
+//         data : {
+//             filled : 12,
+//             status : "OrderMatchedSuccessfully"
+//         }
+//     }
+//     client.xAdd("engine_response", "*", {
+//         response : JSON.stringify(engineResponse)
+//     });

@@ -1,3 +1,4 @@
+import BTree from 'sorted-btree'
 
 export enum EngineRequestOptions{
     CreateOrder,
@@ -18,17 +19,17 @@ interface EngineResponse {
   error?: string;
 }
 
-enum Side{
+export enum Side{
     Buy,
     Sell
 }
 
-enum Type{
+export enum Type{
     Market,
     Limit
 }
 
-enum OrderStatus{
+export enum OrderStatus{
     PartiallyFilled,
     Filled,
     Open,
@@ -46,7 +47,6 @@ interface Order{
     remainingQty : number,
     price : number,
     symbol : string,
-    fills : Fill[],
     timestamp: number;
 }
 
@@ -56,6 +56,7 @@ interface Position{
     averageEntryPrice : number,
     liquidationPrice : number,
     unrealizedPnl: number,
+    size : number,
     margin : number,
     leverage : number,
     symbol : string,
@@ -83,9 +84,29 @@ interface Fill{
 }
 
 interface Orderbook{
-    asks : Map<number, RestingOrder[]>,
-    bids : Map<number, RestingOrder[]>
+    asks : BTree<number, RestingOrder[]>,
+    bids : BTree<number, RestingOrder[]>
 }
 
+interface Balance {
+  available: number;
+  locked: number;
+}
 
-export type { EngineRequest, EngineResponse, Orderbook, Fill, Order, Position,}
+export interface AddBalancePayload{
+    userId : string,
+    symbol : string,
+    amount : number
+}
+
+export interface CreateOrderPayload{
+    userId : string,
+    symbol : string,
+    price : number,
+    quantity : number,
+    side : Side,
+    type : Type,
+    leverage : number
+}
+
+export type { EngineRequest, EngineResponse, Orderbook, Fill, Order, Position, Balance, RestingOrder}
