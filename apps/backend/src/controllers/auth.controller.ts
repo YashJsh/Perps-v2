@@ -4,6 +4,7 @@ import { prisma } from "db";
 import { checkPassword, encryptPassword } from "../utils/password";
 import { createToken } from "../utils/token";
 import { onRampSchema } from "../types/exchange.types";
+import { producerClient } from "../..";
 
 export const signUpController = async (req: Request, res: Response) => {
     try {
@@ -101,8 +102,12 @@ export const onRamp = async (req : Request, res : Response)=>{
     if (!parsed_body){
         throw new Error("Invalid On ramp data");
     };
+    producerClient.xAdd("engine_data", "*", {
+        correlation_id : "1",
+        data  : "from Backend"
+    });
 
+    console.log("Send data to the engine");
     //Sending request to engine
-    //Waiting for the engine to resposnd back
-    
+    //Waiting for the engine to resposnd back 
 }
