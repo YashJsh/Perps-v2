@@ -1,5 +1,5 @@
 {
-  "name": "engine",
+  "name": "types",
   "module": "index.ts",
   "type": "module",
   "private": true,
@@ -8,9 +8,5 @@
   },
   "peerDependencies": {
     "typescript": "^5"
-  },
-  "dependencies": {
-    "types" : "workspace:*",
-    "redis": "^5.12.1"
   }
 }
