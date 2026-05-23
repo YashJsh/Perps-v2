@@ -228,7 +228,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
         const filledQty = data.quantity - remaining_qty;
 
         MakePosition(orderId);
-        
+
         let status: OrderStatus;
 
         if (remaining_qty === 0) {
@@ -247,6 +247,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
         };
     }
 }
+
 
 const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: Orderbook) => {
     let restingOrder: RestingOrder = {

@@ -9,7 +9,10 @@ const client = redis.createClient({
 
 const senderClient = redis.createClient({
     url: "redis://localhost:6379"
-})
+});
+
+await client.connect();
+await senderClient.connect();
 
 const sendResponse = async (data: unknown) => {
     senderClient.xAdd("engine_response", "*", {
@@ -18,7 +21,6 @@ const sendResponse = async (data: unknown) => {
 }
 
 const main = async () => {
-    await client.connect();
     while (true) {
         const message = await client.xRead([
             {
@@ -29,16 +31,20 @@ const main = async () => {
         ], {
             BLOCK: 0
         });
-        console.log(message);
         if (!message) {
             continue;
         }
-        //@ts-ignore
-        let data = message[0].messages[0].message.response;
+       
+         //@ts-ignore
+        let data = message[0].messages[0].message.data;
         let parsedData = JSON.parse(data) as EngineRequest;
+        // console.log("DATA RECIEVED IS : ", parsedData);
 
         try {
             const response = engineHandlePlease(parsedData);
+            if (!response){
+                continue;
+            }
             await sendResponse(response);
         } catch (err) {
             const errorResponse: EngineResponse = {

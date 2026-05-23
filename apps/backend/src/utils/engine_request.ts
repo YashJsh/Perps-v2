@@ -31,7 +31,7 @@ export const sendToEngine = async (type: EngineRequestOptions, payload: Record<s
 
     let response_promise = await waitForResponse(correlation_id);
 
-    await publisherClient.xAdd("backend_request", "*", {
+    await publisherClient.xAdd("engine_data", "*", {
         data : JSON.stringify(message)
     })
     return response_promise;
