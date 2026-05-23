@@ -1,19 +1,19 @@
 
 import redis from "redis";
-import type{ EngineRequest, EngineResponse } from "types";
+import type { EngineRequest, EngineResponse } from "types";
 import { engineHandlePlease } from "./src/engine/engine";
 
 const client = redis.createClient({
-        url: "redis://localhost:6379"
+    url: "redis://localhost:6379"
 });
 
 const senderClient = redis.createClient({
-    url : "redis://localhost:6379"
+    url: "redis://localhost:6379"
 })
 
-const sendResponse = async (data : unknown)=> {
+const sendResponse = async (data: unknown) => {
     senderClient.xAdd("engine_response", "*", {
-        response : JSON.stringify(data)
+        response: JSON.stringify(data)
     })
 }
 
@@ -25,20 +25,31 @@ const main = async () => {
                 key: "engine_data",
                 id: "$"
             },
-            
+
         ], {
-            BLOCK : 0
+            BLOCK: 0
         });
         console.log(message);
-        if (!message){
+        if (!message) {
             continue;
         }
         //@ts-ignore
-        let data =  message[0].messages[0].message.response;
+        let data = message[0].messages[0].message.response;
         let parsedData = JSON.parse(data) as EngineRequest;
-        
-        const response_data = engineHandlePlease(parsedData);
-        await sendResponse(response_data);
+
+        try {
+            const response = engineHandlePlease(parsedData);
+            await sendResponse(response);
+        } catch (err) {
+            const errorResponse: EngineResponse = {
+                correlationId: parsedData.correlationId,
+                ok: false,
+                error: err instanceof Error
+                    ? err.message
+                    : "Unknown engine error"
+            };
+            await sendResponse(errorResponse);
+        }
     }
 };
 main();

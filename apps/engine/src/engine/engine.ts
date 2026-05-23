@@ -1,6 +1,7 @@
 import { EngineRequestOptions, type EngineRequest, type EngineResponse } from "types";
 import { handleAddBalance } from "./balance";
 import { handleCreateOrder } from "./createOrder";
+import { handleCurrentPrice } from "./price";
 
 
 const engineHandlePlease = (request : EngineRequest)=>{
@@ -14,13 +15,14 @@ const engineHandlePlease = (request : EngineRequest)=>{
         return response_object
     };
 
-
     if (request.type == EngineRequestOptions.CreateOrder){
-        handleCreateOrder(request);
+        const response = handleCreateOrder(request);
+        return response;
     }
 
+    if (request.type == EngineRequestOptions.CurrentPrice){
+        handleCurrentPrice(request);   
+    }
 }
-
-
 
 export { engineHandlePlease }

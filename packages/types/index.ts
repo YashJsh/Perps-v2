@@ -3,7 +3,8 @@ import BTree from 'sorted-btree'
 export enum EngineRequestOptions{
     CreateOrder,
     AddBalance,
-    CloseOrder
+    CloseOrder,
+    CurrentPrice,
 }
 
 interface EngineRequest {
@@ -48,6 +49,7 @@ interface Order{
     price : number,
     symbol : string,
     timestamp: number;
+    leverage : number;
 }
 
 interface Position{
