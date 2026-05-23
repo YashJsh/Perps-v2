@@ -5,6 +5,17 @@ const onRampSchema = z.object({
     amount : z.number()
 });
 
+const createOrderSchema = z.object({
+    userId : z.string(),
+    symbol : z.enum(["Buy", "Sell"]),
+    price : z.number(),
+    quantity : z.number(),
+    side : z.enum(["Buy", "Sell"]),
+    type : z.enum(["Market", "Limit"]),
+    leverage : z.number()
+})
+
 export {
-    onRampSchema
+    onRampSchema,
+    createOrderSchema
 }
