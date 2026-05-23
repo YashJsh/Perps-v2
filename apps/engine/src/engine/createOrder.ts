@@ -37,7 +37,7 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
         timestamp: Date.now(),
         type: data.type,
         userId: data.userId,
-        leverage : data.leverage
+        leverage: data.leverage
     });
 
     //Get orderbook
@@ -46,183 +46,72 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
         return;
     }
 
-    let remaining_qty = data.quantity;
+    if (data.type == Type.Limit) {
+        let remaining_qty = data.quantity;
 
-    for (const [price, order] of orderbook.asks.entries()) {
-        if (price <= data.price) {
-            for (let i = 0; i < order.length; i++) {
-                let sellingOrder = order[i];
-                if (!sellingOrder) {
-                    continue;
-                }
-                const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
+        for (const [price, order] of orderbook.asks.entries()) {
+            if (price <= data.price) {
+                for (let i = 0; i < order.length; i++) {
+                    let sellingOrder = order[i];
+                    if (!sellingOrder) {
+                        continue;
+                    }
+                    const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
 
-                //Maker fill
-                const buyerFills = FILLS.getOrInsert(orderId, []);
-                let fill_order: Fill = {
-                    orderId,
-                    makerId: data.userId,
-                    takerId: sellingOrder.userId,
-                    makerOrderId: orderId,
-                    takerOrderId: sellingOrder.orderId,
-                    filledQty: matchingQty,
-                    price: sellingOrder.price
-                };
-                buyerFills.push(fill_order);
+                    //Maker fill
+                    const buyerFills = FILLS.getOrInsert(orderId, []);
+                    let fill_order: Fill = {
+                        orderId,
+                        makerId: data.userId,
+                        takerId: sellingOrder.userId,
+                        makerOrderId: orderId,
+                        takerOrderId: sellingOrder.orderId,
+                        filledQty: matchingQty,
+                        price: sellingOrder.price
+                    };
+                    buyerFills.push(fill_order);
 
-                const sellerFills = FILLS.getOrInsert(orderId, []);
-                let seller_fill_order: Fill = {
-                    orderId,
-                    makerId: data.userId,
-                    takerId: sellingOrder.userId,
-                    makerOrderId: orderId,
-                    takerOrderId: sellingOrder.orderId,
-                    filledQty: matchingQty,
-                    price: sellingOrder.price
-                };
-                sellerFills.push(seller_fill_order);
+                    const sellerFills = FILLS.getOrInsert(orderId, []);
+                    let seller_fill_order: Fill = {
+                        orderId,
+                        makerId: data.userId,
+                        takerId: sellingOrder.userId,
+                        makerOrderId: orderId,
+                        takerOrderId: sellingOrder.orderId,
+                        filledQty: matchingQty,
+                        price: sellingOrder.price
+                    };
+                    sellerFills.push(seller_fill_order);
 
-                //Remove the remaining qty;
-                remaining_qty -= matchingQty;
+                    //Remove the remaining qty;
+                    remaining_qty -= matchingQty;
 
-                let buyingOrder = ORDER.get(orderId);
-                if (!buyingOrder) {
-                    return;
-                }
-                buyingOrder.remainingQty -= matchingQty;
-                buyingOrder.filledQty += matchingQty;
+                    let buyingOrder = ORDER.get(orderId);
+                    if (!buyingOrder) {
+                        return;
+                    }
+                    buyingOrder.remainingQty -= matchingQty;
+                    buyingOrder.filledQty += matchingQty;
 
-                let sellOrder = ORDER.get(sellingOrder.orderId);
-                if (!sellOrder) {
-                    return;
-                }
-                sellOrder.remainingQty -= matchingQty;
-                sellOrder.filledQty += matchingQty;
+                    let sellOrder = ORDER.get(sellingOrder.orderId);
+                    if (!sellOrder) {
+                        return;
+                    }
+                    sellOrder.remainingQty -= matchingQty;
+                    sellOrder.filledQty += matchingQty;
 
-                if (sellOrder.remainingQty == 0) {
-                    //Remove the orderfrom the book;
-                    order.splice(i, 1);
-                    i--;
-                }
-            }
-        }
-    }
-    let restingOrder;
-    if (remaining_qty > 0) {
-        restingOrder = addBids(data, orderId, remaining_qty, orderbook);
-    }
-
-    const filledQty = data.quantity - remaining_qty;
-    
-    MakePosition(orderId);
-
-    let status: OrderStatus;
-
-    if (remaining_qty === 0) {
-        status = OrderStatus.Filled;
-    } else if (filledQty > 0) {
-        status = OrderStatus.PartiallyFilled;
-    } else {
-        status = OrderStatus.Open;
-    }
-    return {
-        success: true,
-        orderId,
-        filledQty,
-        remainingQty: remaining_qty,
-        status
-    };
-}
-
-const handleSellOrder = (data: CreateOrderPayload) => {
-    let orderId = crypto.randomUUID();
-    ORDER.set(orderId, {
-        filledQty: 0,
-        price: data.price,
-        orderId,
-        quantity: data.quantity,
-        remainingQty: data.quantity,
-        side: data.side,
-        status: OrderStatus.Open,
-        symbol: data.symbol,
-        timestamp: Date.now(),
-        type: data.type,
-        userId: data.userId,
-        leverage : data.leverage
-    });
-
-    //Get orderbook
-    const orderbook = ORDERBOOK.get(data.symbol);
-    if (!orderbook) {
-        return;
-    }
-
-    let remaining_qty = data.quantity;
-    if (remaining_qty == 0) {
-        return;
-    }
-
-    for (const [price, order] of orderbook.bids.entries()) {
-        if (price >= data.price) {
-            for (let i = 0; i < order.length; i++) {
-                let buyingOrder = order[i];
-                if (!buyingOrder) {
-                    continue;
-                }
-                const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
-
-                //Maker fill
-                const buyerFills = FILLS.getOrInsert(orderId, []);
-                let fill_order: Fill = {
-                    orderId,
-                    makerId: data.userId,
-                    takerId: buyingOrder.userId,
-                    makerOrderId: orderId,
-                    takerOrderId: buyingOrder.orderId,
-                    filledQty: matchingQty,
-                    price: buyingOrder.price
-                };
-                buyerFills.push(fill_order);
-
-                const sellerFills = FILLS.getOrInsert(orderId, []);
-                let seller_fill_order: Fill = {
-                    orderId,
-                    makerId: buyingOrder?.userId,
-                    takerId: data.userId,
-                    makerOrderId: buyingOrder?.orderId,
-                    takerOrderId: orderId,
-                    filledQty: matchingQty,
-                    price: buyingOrder.price
-                };
-
-                sellerFills.push(seller_fill_order);
-                //Remove the remaining qty;
-                remaining_qty -= matchingQty;
-
-                let buyOrder = ORDER.get(buyingOrder.orderId);
-                if (!buyOrder) {
-                    return;
-                }
-                buyOrder.remainingQty -= matchingQty;
-                buyOrder.filledQty += matchingQty;
-
-                let sellOrder = ORDER.get(orderId);
-                if (!sellOrder) {
-                    return;
-                }
-                sellOrder.remainingQty -= matchingQty;
-                sellOrder.filledQty += matchingQty;
-
-                if (buyOrder.remainingQty == 0) {
-                    //Remove the orderfrom the book;
-                    order.splice(i, 1);
-                    i--;
+                    if (sellOrder.remainingQty == 0) {
+                        //Remove the orderfrom the book;
+                        order.splice(i, 1);
+                        i--;
+                    }
                 }
             }
         }
+
         let restingOrder;
         if (remaining_qty > 0) {
-            restingOrder = addAsks(data, orderId, remaining_qty, orderbook);
+            restingOrder = addBids(data, orderId, remaining_qty, orderbook);
         }
 
         const filledQty = data.quantity - remaining_qty;
@@ -245,6 +134,268 @@ const handleSellOrder = (data: CreateOrderPayload) => {
             remainingQty: remaining_qty,
             status
         };
+    } else {
+        let remaining_qty = data.quantity;
+
+        for (const [price, order] of orderbook.asks.entries()) {
+            if (price <= data.price) {
+                for (let i = 0; i < order.length; i++) {
+                    let sellingOrder = order[i];
+                    if (!sellingOrder) {
+                        continue;
+                    }
+                    const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
+
+                    //Maker fill
+                    const buyerFills = FILLS.getOrInsert(orderId, []);
+                    let fill_order: Fill = {
+                        orderId,
+                        makerId: data.userId,
+                        takerId: sellingOrder.userId,
+                        makerOrderId: orderId,
+                        takerOrderId: sellingOrder.orderId,
+                        filledQty: matchingQty,
+                        price: sellingOrder.price
+                    };
+                    buyerFills.push(fill_order);
+
+                    const sellerFills = FILLS.getOrInsert(orderId, []);
+                    let seller_fill_order: Fill = {
+                        orderId,
+                        makerId: data.userId,
+                        takerId: sellingOrder.userId,
+                        makerOrderId: orderId,
+                        takerOrderId: sellingOrder.orderId,
+                        filledQty: matchingQty,
+                        price: sellingOrder.price
+                    };
+                    sellerFills.push(seller_fill_order);
+
+                    //Remove the remaining qty;
+                    remaining_qty -= matchingQty;
+
+                    let buyingOrder = ORDER.get(orderId);
+                    if (!buyingOrder) {
+                        return;
+                    }
+                    buyingOrder.remainingQty -= matchingQty;
+                    buyingOrder.filledQty += matchingQty;
+
+                    let sellOrder = ORDER.get(sellingOrder.orderId);
+                    if (!sellOrder) {
+                        return;
+                    }
+                    sellOrder.remainingQty -= matchingQty;
+                    sellOrder.filledQty += matchingQty;
+
+                    if (sellOrder.remainingQty == 0) {
+                        //Remove the orderfrom the book;
+                        order.splice(i, 1);
+                        i--;
+                    }
+                }
+            }
+        }
+
+        return {
+            success: true,
+            orderId,
+            filledQty: data.quantity - remaining_qty,
+            remaining_qty,
+            status: remaining_qty == 0 ? OrderStatus.Filled : OrderStatus.PartiallyFilled
+        }
+    }
+
+
+}
+
+const handleSellOrder = (data: CreateOrderPayload) => {
+    let orderId = crypto.randomUUID();
+    ORDER.set(orderId, {
+        filledQty: 0,
+        price: data.price,
+        orderId,
+        quantity: data.quantity,
+        remainingQty: data.quantity,
+        side: data.side,
+        status: OrderStatus.Open,
+        symbol: data.symbol,
+        timestamp: Date.now(),
+        type: data.type,
+        userId: data.userId,
+        leverage: data.leverage
+    });
+
+    //Get orderbook
+    const orderbook = ORDERBOOK.get(data.symbol);
+    if (!orderbook) {
+        return;
+    }
+
+    if (data.type == Type.Limit) {
+        let remaining_qty = data.quantity;
+        if (remaining_qty == 0) {
+            return;
+        }
+
+        for (const [price, order] of orderbook.bids.entries()) {
+            if (price >= data.price) {
+                for (let i = 0; i < order.length; i++) {
+                    let buyingOrder = order[i];
+                    if (!buyingOrder) {
+                        continue;
+                    }
+                    const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
+
+                    //Maker fill
+                    const buyerFills = FILLS.getOrInsert(orderId, []);
+                    let fill_order: Fill = {
+                        orderId,
+                        makerId: data.userId,
+                        takerId: buyingOrder.userId,
+                        makerOrderId: orderId,
+                        takerOrderId: buyingOrder.orderId,
+                        filledQty: matchingQty,
+                        price: buyingOrder.price
+                    };
+                    buyerFills.push(fill_order);
+
+                    const sellerFills = FILLS.getOrInsert(orderId, []);
+                    let seller_fill_order: Fill = {
+                        orderId,
+                        makerId: buyingOrder?.userId,
+                        takerId: data.userId,
+                        makerOrderId: buyingOrder?.orderId,
+                        takerOrderId: orderId,
+                        filledQty: matchingQty,
+                        price: buyingOrder.price
+                    };
+
+                    sellerFills.push(seller_fill_order);
+                    //Remove the remaining qty;
+                    remaining_qty -= matchingQty;
+
+                    let buyOrder = ORDER.get(buyingOrder.orderId);
+                    if (!buyOrder) {
+                        return;
+                    }
+                    buyOrder.remainingQty -= matchingQty;
+                    buyOrder.filledQty += matchingQty;
+
+                    let sellOrder = ORDER.get(orderId);
+                    if (!sellOrder) {
+                        return;
+                    }
+                    sellOrder.remainingQty -= matchingQty;
+                    sellOrder.filledQty += matchingQty;
+
+                    if (buyOrder.remainingQty == 0) {
+                        //Remove the orderfrom the book;
+                        order.splice(i, 1);
+                        i--;
+                    }
+                }
+            }
+            let restingOrder;
+            if (remaining_qty > 0) {
+                restingOrder = addAsks(data, orderId, remaining_qty, orderbook);
+            }
+
+            const filledQty = data.quantity - remaining_qty;
+
+            MakePosition(orderId);
+
+            let status: OrderStatus;
+
+            if (remaining_qty === 0) {
+                status = OrderStatus.Filled;
+            } else if (filledQty > 0) {
+                status = OrderStatus.PartiallyFilled;
+            } else {
+                status = OrderStatus.Open;
+            }
+            return {
+                success: true,
+                orderId,
+                filledQty,
+                remainingQty: remaining_qty,
+                status
+            };
+        }
+    }
+    else {
+        let remaining_qty = data.quantity;
+        if (remaining_qty == 0) {
+            return;
+        }
+
+        for (const [price, order] of orderbook.bids.entries()) {
+            if (price >= data.price) {
+                for (let i = 0; i < order.length; i++) {
+                    let buyingOrder = order[i];
+                    if (!buyingOrder) {
+                        continue;
+                    }
+                    const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
+
+                    //Maker fill
+                    const buyerFills = FILLS.getOrInsert(orderId, []);
+                    let fill_order: Fill = {
+                        orderId,
+                        makerId: data.userId,
+                        takerId: buyingOrder.userId,
+                        makerOrderId: orderId,
+                        takerOrderId: buyingOrder.orderId,
+                        filledQty: matchingQty,
+                        price: buyingOrder.price
+                    };
+                    buyerFills.push(fill_order);
+
+                    const sellerFills = FILLS.getOrInsert(orderId, []);
+                    let seller_fill_order: Fill = {
+                        orderId,
+                        makerId: buyingOrder?.userId,
+                        takerId: data.userId,
+                        makerOrderId: buyingOrder?.orderId,
+                        takerOrderId: orderId,
+                        filledQty: matchingQty,
+                        price: buyingOrder.price
+                    };
+
+                    sellerFills.push(seller_fill_order);
+                    //Remove the remaining qty;
+                    remaining_qty -= matchingQty;
+
+                    let buyOrder = ORDER.get(buyingOrder.orderId);
+                    if (!buyOrder) {
+                        return;
+                    }
+                    buyOrder.remainingQty -= matchingQty;
+                    buyOrder.filledQty += matchingQty;
+
+                    let sellOrder = ORDER.get(orderId);
+                    if (!sellOrder) {
+                        return;
+                    }
+                    sellOrder.remainingQty -= matchingQty;
+                    sellOrder.filledQty += matchingQty;
+
+                    if (buyOrder.remainingQty == 0) {
+                        //Remove the orderfrom the book;
+                        order.splice(i, 1);
+                        i--;
+                    }
+                }
+            }
+            return {
+                success: true,
+                orderId,
+                filledQty: data.quantity - remaining_qty,
+                remainingQty: remaining_qty,
+                status: remaining_qty == 0 ? OrderStatus.Filled : OrderStatus.PartiallyFilled
+            }
+        }
+
     }
 }
 

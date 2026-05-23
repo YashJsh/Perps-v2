@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { decodeToken, verifyToken } from "../utils/token";
-
+import { verifyToken } from "../utils/token";
 
 export const authMiddleware = (req : Request, res : Response, next : NextFunction)=>{
     const token = req.headers.authorization as string;
