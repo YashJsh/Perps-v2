@@ -49,11 +49,9 @@ export const MakePosition = (orderId : string)=>{
 }
 
 const buyLiquidationPrice = (entryPrice : number, leverage : number)=>{
-    const formula = 1 - 1 / leverage;
-    return entryPrice * formula;
+    return entryPrice - entryPrice / leverage;
 }
 
 const sellLiquidationPrice = (entryPrice : number, leverage : number)=>{
-    const formula = 1 + 1 / leverage;
-    return entryPrice * formula;
+    return entryPrice + entryPrice / leverage;
 }

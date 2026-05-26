@@ -2,6 +2,7 @@ import { EngineRequestOptions, type EngineRequest, type EngineResponse } from "t
 import { handleAddBalance } from "./balance";
 import { handleCreateOrder } from "./createOrder";
 import { handleCurrentPrice } from "./price";
+import { handleDeleteOrder } from "./deleteOrder";
 
 
 const engineHandlePlease = (request : EngineRequest)=>{
@@ -22,6 +23,11 @@ const engineHandlePlease = (request : EngineRequest)=>{
 
     if (request.type == EngineRequestOptions.CurrentPrice){
         handleCurrentPrice(request);   
+    }
+
+    if (request.type == EngineRequestOptions.CancelOrder){
+        const response = handleDeleteOrder(request);
+        return response;
     }
 }
 

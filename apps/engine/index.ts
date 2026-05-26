@@ -35,7 +35,7 @@ const main = async () => {
             continue;
         }
        
-         //@ts-ignore
+        //@ts-ignore
         let data = message[0].messages[0].message.data;
         let parsedData = JSON.parse(data) as EngineRequest;
         // console.log("DATA RECIEVED IS : ", parsedData);

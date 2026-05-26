@@ -5,6 +5,7 @@ export enum EngineRequestOptions{
     AddBalance,
     CloseOrder,
     CurrentPrice,
+    CancelOrder
 }
 
 interface EngineRequest {
@@ -109,6 +110,12 @@ export interface CreateOrderPayload{
     side : Side,
     type : Type,
     leverage : number
+}
+
+export interface DeleteOrderPayload{
+    userId : string, 
+    orderId : string,
+    symbol : string
 }
 
 export type { EngineRequest, EngineResponse, Orderbook, Fill, Order, Position, Balance, RestingOrder}
