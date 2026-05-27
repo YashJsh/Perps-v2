@@ -1,4 +1,4 @@
-import type { CreateOrderPayload } from "types";
+import { Side, type CreateOrderPayload } from "types";
 import { POSITION } from "../store/store";
 
 export const riskEngine = (payload: CreateOrderPayload): Boolean => {
@@ -7,7 +7,8 @@ export const riskEngine = (payload: CreateOrderPayload): Boolean => {
     if (!position) {
         return true;
     };
-    const current = position.size;
+
+    const current = payload.side == Side.Buy ? position.size : - position.size;
     const next = current + payload.quantity;
 
     if (Math.abs(current) < Math.abs(next)){

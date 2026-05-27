@@ -49,6 +49,7 @@
       "name": "engine",
       "dependencies": {
         "redis": "^5.12.1",
+        "sorted-btree": "^2.1.0",
         "types": "workspace:*",
       },
       "devDependencies": {

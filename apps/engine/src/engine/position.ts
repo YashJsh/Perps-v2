@@ -17,7 +17,6 @@ const updateRealizedPnlShort = (entryPrice: number, size: number, exitPrice: num
     return (entryPrice - exitPrice) * size;
 };
 
-
 export const positionAccounting = (orderId: string) => {
     const order = ORDER.get(orderId);
     if (!order) {
@@ -34,7 +33,7 @@ export const positionAccounting = (orderId: string) => {
 
 
     let new_notional_value = 0;
-    let incoming_signed_exposure = 0;
+    let incoming_signed_exposure = 0; // Total qty
 
     for (let i = 0; i < fills.length; i++) {
         const currentFill = fills[i];
@@ -105,9 +104,9 @@ export const positionAccounting = (orderId: string) => {
             const calculatePnl = position.size > 0 ? updateRealizedPnlLong(position.averageEntryPrice, position.size, exitPrice) : updateRealizedPnlShort(position.averageEntryPrice, position.size, exitPrice);
 
             position.realizedPnl = calculatePnl;
+            balances.available += calculatePnl + balances.locked;
             balances.locked -= position.margin;
-            balances.available += calculatePnl;
-
+            
             return;
         }
         if (Math.abs(new_qty) < Math.abs(position.size)) {
@@ -121,7 +120,6 @@ export const positionAccounting = (orderId: string) => {
                 )
             const exitPrice = new_notional_value / Math.abs(incoming_signed_exposure)
             const calculatePnl = position.size > 0 ? updateRealizedPnlLong(position.averageEntryPrice, closedQty, exitPrice) : updateRealizedPnlShort(position.averageEntryPrice, closedQty, exitPrice);
-
 
             balances.available += calculatePnl;
             position.size = new_qty;

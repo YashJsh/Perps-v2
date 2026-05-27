@@ -1,18 +1,19 @@
-import { OrderStatus, Side, Type } from "types";
 import type { CreateOrderPayload, Fill, Orderbook, RestingOrder } from "types";
 import { FILLS, ORDER, ORDERBOOK } from "../store/store";
+import { OrderStatus, Side, Type } from "types";
 import { riskEngine } from "./risk";
 import { handleBalanceChecks } from "./balance";
 import { positionAccounting } from "./position";
+import BTree from "sorted-btree";
 
 export const handleCreateOrder = (payload: unknown) => {
     const data = payload as CreateOrderPayload;
-
+    
     const risk = riskEngine(data);
     if (risk) {
         handleBalanceChecks();
     };
-
+    
     if (data.side == Side.Buy) {
         const response = handleBuyOrder(data);
         return response;
@@ -72,7 +73,7 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                     };
                     buyerFills.push(fill_order);
 
-                    const sellerFills = FILLS.getOrInsert(orderId, []);
+                    const sellerFills = FILLS.getOrInsert(sellingOrder.orderId, []);
                     let seller_fill_order: Fill = {
                         orderId,
                         makerId: data.userId,
@@ -104,8 +105,17 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
 
                     if (sellOrder.remainingQty == 0) {
                         //Remove the orderfrom the book;
+                        sellOrder.status = OrderStatus.Filled;
                         order.splice(i, 1);
                         i--;
+                    }
+
+                    if (remaining_qty === 0) {
+                        buyingOrder.status = OrderStatus.Filled;
+                    } else if (remaining_qty < data.quantity) {
+                        buyingOrder.status = OrderStatus.PartiallyFilled;
+                    } else {
+                        buyingOrder.status = OrderStatus.Open;
                     }
                 }
             }
@@ -118,23 +128,16 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
 
         const filledQty = data.quantity - remaining_qty;
 
-        positionAccounting(orderId);
-
-        let status: OrderStatus;
-
-        if (remaining_qty === 0) {
-            status = OrderStatus.Filled;
-        } else if (filledQty > 0) {
-            status = OrderStatus.PartiallyFilled;
-        } else {
-            status = OrderStatus.Open;
+        if (remaining_qty != data?.quantity){
+            positionAccounting(orderId);
         }
+        console.log("Filled qty : ", filledQty);
+        console.log("Remaining qty : ", remaining_qty);
+        const order = ORDER.get(orderId);
+        
         return {
             success: true,
-            orderId,
-            filledQty,
-            remainingQty: remaining_qty,
-            status
+            order : order
         };
     } else {
         let remaining_qty = data.quantity;
@@ -162,7 +165,7 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                     };
                     buyerFills.push(fill_order);
 
-                    const sellerFills = FILLS.getOrInsert(orderId, []);
+                    const sellerFills = FILLS.getOrInsert(sellingOrder.orderId, []);
                     let seller_fill_order: Fill = {
                         orderId,
                         makerId: data.userId,
@@ -194,23 +197,33 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
 
                     if (sellOrder.remainingQty == 0) {
                         //Remove the orderfrom the book;
+                        sellOrder.status = OrderStatus.Filled;
                         order.splice(i, 1);
                         i--;
+                    }
+                    if (remaining_qty == 0){
+                        buyingOrder.status = OrderStatus.Filled;
                     }
                 }
             }
         }
+  
+        positionAccounting(orderId);
+       
 
+        const get_order = ORDER.get(orderId);
         return {
-            success: true,
-            orderId,
-            filledQty: data.quantity - remaining_qty,
-            remaining_qty,
-            status: remaining_qty == 0 ? OrderStatus.Filled : OrderStatus.PartiallyFilled
-        }
+                success: true,
+                order : get_order
+        };
+        // return {
+        //     success: true,
+        //     orderId,
+        //     filledQty: data.quantity - remaining_qty,
+        //     remaining_qty,
+        //     status: remaining_qty == 0 ? OrderStatus.Filled : OrderStatus.PartiallyFilled
+        // }
     }
-
-
 }
 
 const handleSellOrder = (data: CreateOrderPayload) => {
@@ -242,7 +255,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
             return;
         }
 
-        for (const [price, order] of orderbook.bids.entries()) {
+        for (const [price, order] of orderbook.bids.entriesReversed()) {
             if (price >= data.price) {
                 for (let i = 0; i < order.length; i++) {
                     let buyingOrder = order[i];
@@ -252,7 +265,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                     const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
 
                     //Maker fill
-                    const buyerFills = FILLS.getOrInsert(orderId, []);
+                    const buyerFills = FILLS.getOrInsert(buyingOrder.orderId, []);
                     let fill_order: Fill = {
                         orderId,
                         makerId: data.userId,
@@ -297,8 +310,17 @@ const handleSellOrder = (data: CreateOrderPayload) => {
 
                     if (buyOrder.remainingQty == 0) {
                         //Remove the orderfrom the book;
+                        buyOrder.status = OrderStatus.Filled;
                         order.splice(i, 1);
                         i--;
+                    }
+
+                    if (remaining_qty === 0) {
+                        sellOrder.status = OrderStatus.Filled;
+                    } else if (remaining_qty < data.quantity) {
+                        sellOrder.status = OrderStatus.PartiallyFilled;
+                    } else {
+                        sellOrder.status = OrderStatus.Open;
                     }
                 }
             }
@@ -309,8 +331,10 @@ const handleSellOrder = (data: CreateOrderPayload) => {
 
             const filledQty = data.quantity - remaining_qty;
 
-            positionAccounting(orderId);
-
+            if (remaining_qty != data?.quantity){
+                positionAccounting(orderId);
+            }
+            
             let status: OrderStatus;
 
             if (remaining_qty === 0) {
@@ -320,13 +344,18 @@ const handleSellOrder = (data: CreateOrderPayload) => {
             } else {
                 status = OrderStatus.Open;
             }
+            const get_order = ORDER.get(orderId);
             return {
                 success: true,
-                orderId,
-                filledQty,
-                remainingQty: remaining_qty,
-                status
+                order : get_order
             };
+            // return {
+            //     success: true,
+            //     orderId,
+            //     filledQty,
+            //     remainingQty: remaining_qty,
+            //     status
+            // };
         }
     }
     else {
@@ -335,7 +364,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
             return;
         }
 
-        for (const [price, order] of orderbook.bids.entries()) {
+        for (const [price, order] of orderbook.bids.entriesReversed()) {
             if (price >= data.price) {
                 for (let i = 0; i < order.length; i++) {
                     let buyingOrder = order[i];
@@ -345,7 +374,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                     const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
 
                     //Maker fill
-                    const buyerFills = FILLS.getOrInsert(orderId, []);
+                    const buyerFills = FILLS.getOrInsert(buyingOrder.orderId, []);
                     let fill_order: Fill = {
                         orderId,
                         makerId: data.userId,
@@ -390,20 +419,37 @@ const handleSellOrder = (data: CreateOrderPayload) => {
 
                     if (buyOrder.remainingQty == 0) {
                         //Remove the orderfrom the book;
+                        buyOrder.status = OrderStatus.Filled;
                         order.splice(i, 1);
                         i--;
                     }
+
+                    if (remaining_qty == 0){
+                        sellOrder.status = OrderStatus.Filled;
+                    }
+                   
                 }
             }
-            return {
-                success: true,
-                orderId,
-                filledQty: data.quantity - remaining_qty,
-                remainingQty: remaining_qty,
-                status: remaining_qty == 0 ? OrderStatus.Filled : OrderStatus.PartiallyFilled
-            }
+            
+            // return {
+            //     success: true,
+            //     orderId,
+            //     filledQty: data.quantity - remaining_qty,
+            //     remainingQty: remaining_qty,
+            //     status: remaining_qty == 0 ? OrderStatus.Filled : OrderStatus.PartiallyFilled
+            // }
         }
 
+        const get_order = ORDER.get(orderId);
+        if (remaining_qty > 0 && remaining_qty < data.quantity){
+            get_order!.status = OrderStatus.PartiallyFilled;
+        }
+        positionAccounting(orderId);
+        
+            return {
+                success: true,
+                order : get_order
+        };
     }
 }
 

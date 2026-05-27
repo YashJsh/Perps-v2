@@ -3,6 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "test": "bun test",
+    "bench": "bun test/benchmark.engine.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -10,7 +14,8 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "types" : "workspace:*",
-    "redis": "^5.12.1"
+    "redis": "^5.12.1",
+    "sorted-btree": "^2.1.0",
+    "types": "workspace:*"
   }
 }
