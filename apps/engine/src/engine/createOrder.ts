@@ -407,7 +407,6 @@ const handleSellOrder = (data: CreateOrderPayload) => {
     }
 }
 
-
 const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: Orderbook) => {
     let restingOrder: RestingOrder = {
         orderId: orderId,
