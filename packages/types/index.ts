@@ -54,11 +54,10 @@ interface Order{
 }
 
 interface Position{
-    id : string,
     userId : string,
     averageEntryPrice : number,
     liquidationPrice : number,
-    unrealizedPnl: number,
+    realizedPnl: number | null,
     size : number,
     margin : number,
     leverage : number,
@@ -83,7 +82,8 @@ interface Fill{
     makerOrderId : string,
     takerOrderId : string,
     filledQty : number,
-    price : number
+    price : number,
+    marked : boolean
 }
 
 interface Orderbook{

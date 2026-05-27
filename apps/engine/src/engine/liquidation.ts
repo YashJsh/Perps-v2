@@ -7,9 +7,9 @@ const checkLiquidation = (markPrice : number)=>{
     //Update unrealized PNL
     pos.forEach((p)=>{
         if (p.size > 1){
-            p.unrealizedPnl = updateUnrealizedPnlLong(p.averageEntryPrice, p.size, markPrice);
+            p.realizedPnl = updateUnrealizedPnlLong(p.averageEntryPrice, p.size, markPrice);
         }else{
-            p.unrealizedPnl = updateUnrealizedPnlShort(p.averageEntryPrice, p.size, markPrice);
+            p.realizedPnl = updateUnrealizedPnlShort(p.averageEntryPrice, p.size, markPrice);
         }
         const bufferedPrice = p.liquidationPrice + (p.liquidationPrice * 0.1);
         if (bufferedPrice <= markPrice){

@@ -3,7 +3,7 @@ import type { CreateOrderPayload, Fill, Orderbook, RestingOrder } from "types";
 import { FILLS, ORDER, ORDERBOOK } from "../store/store";
 import { riskEngine } from "./risk";
 import { handleBalanceChecks } from "./balance";
-import { MakePosition } from "./position";
+import { positionAccounting } from "./position";
 
 export const handleCreateOrder = (payload: unknown) => {
     const data = payload as CreateOrderPayload;
@@ -67,7 +67,8 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         makerOrderId: orderId,
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
-                        price: sellingOrder.price
+                        price: sellingOrder.price,
+                        marked : false,
                     };
                     buyerFills.push(fill_order);
 
@@ -79,7 +80,8 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         makerOrderId: orderId,
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
-                        price: sellingOrder.price
+                        price: sellingOrder.price,
+                        marked : false
                     };
                     sellerFills.push(seller_fill_order);
 
@@ -116,7 +118,7 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
 
         const filledQty = data.quantity - remaining_qty;
 
-        MakePosition(orderId);
+        positionAccounting(orderId);
 
         let status: OrderStatus;
 
@@ -155,7 +157,8 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         makerOrderId: orderId,
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
-                        price: sellingOrder.price
+                        price: sellingOrder.price,
+                        marked : false,
                     };
                     buyerFills.push(fill_order);
 
@@ -167,7 +170,8 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         makerOrderId: orderId,
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
-                        price: sellingOrder.price
+                        price: sellingOrder.price,
+                        marked : false
                     };
                     sellerFills.push(seller_fill_order);
 
@@ -256,7 +260,8 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         makerOrderId: orderId,
                         takerOrderId: buyingOrder.orderId,
                         filledQty: matchingQty,
-                        price: buyingOrder.price
+                        price: buyingOrder.price,
+                        marked : false,
                     };
                     buyerFills.push(fill_order);
 
@@ -268,7 +273,8 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         makerOrderId: buyingOrder?.orderId,
                         takerOrderId: orderId,
                         filledQty: matchingQty,
-                        price: buyingOrder.price
+                        price: buyingOrder.price,
+                        marked : false,
                     };
 
                     sellerFills.push(seller_fill_order);
@@ -303,7 +309,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
 
             const filledQty = data.quantity - remaining_qty;
 
-            MakePosition(orderId);
+            positionAccounting(orderId);
 
             let status: OrderStatus;
 
@@ -347,7 +353,8 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         makerOrderId: orderId,
                         takerOrderId: buyingOrder.orderId,
                         filledQty: matchingQty,
-                        price: buyingOrder.price
+                        price: buyingOrder.price,
+                        marked : false
                     };
                     buyerFills.push(fill_order);
 
@@ -359,7 +366,8 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         makerOrderId: buyingOrder?.orderId,
                         takerOrderId: orderId,
                         filledQty: matchingQty,
-                        price: buyingOrder.price
+                        price: buyingOrder.price,
+                        marked : false,
                     };
 
                     sellerFills.push(seller_fill_order);
