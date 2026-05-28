@@ -3,7 +3,7 @@ import BTree from 'sorted-btree'
 export enum EngineRequestOptions{
     CreateOrder,
     AddBalance,
-    CloseOrder,
+    ClosePosition,
     CurrentPrice,
     CancelOrder
 }

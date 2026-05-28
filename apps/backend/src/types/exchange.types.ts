@@ -15,7 +15,12 @@ const createOrderSchema = z.object({
     leverage : z.number()
 })
 
+const cancelOrderSchema = z.object({
+    orderId : z.string(),
+})
+
 export {
     onRampSchema,
-    createOrderSchema
+    createOrderSchema,
+    cancelOrderSchema
 }
