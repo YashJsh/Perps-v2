@@ -1,5 +1,6 @@
 import type { AddBalancePayload, EngineRequest } from "types";
 import { BALANCES } from "../store/store";
+import { getAllJSDocTags } from "typescript";
 
 const handleAddBalance = (payload: unknown) => {
     const data = payload as AddBalancePayload;
@@ -10,10 +11,14 @@ const handleAddBalance = (payload: unknown) => {
             available: data.amount,
             locked: 0
         });
+        let getBal = BALANCES.get(data.userId);
+        if (!getBal){
+            throw new Error("User not found");
+        }
         return {
             userId: data.userId,
-            available : setBal.get(data.userId)?.available,
-            locked : setBal.get(data.userId)?.locked
+            available : getBal.available,
+            locked : getBal.locked
         }
     }
     user.available += data.amount;

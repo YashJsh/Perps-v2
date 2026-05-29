@@ -12,10 +12,12 @@ export interface CancelOrderResponse{
 
 export interface AddBalanceResponse{
     userId : string,
-    newBalance : number,
+    available : number,
+    locked : number
 }
 
 export type EngineResponseData =
     | CreateOrderResponse
     | CancelOrderResponse
     | AddBalanceResponse;
+

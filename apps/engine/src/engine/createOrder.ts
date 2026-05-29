@@ -133,11 +133,11 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
         }
         console.log("Filled qty : ", filledQty);
         console.log("Remaining qty : ", remaining_qty);
-        const order = ORDER.get(orderId);
+       
         
         return {
             success: true,
-            order : order
+            orderId : orderId
         };
     } else {
         let remaining_qty = data.quantity;
@@ -210,11 +210,9 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
   
         positionAccounting(orderId);
        
-
-        const get_order = ORDER.get(orderId);
         return {
                 success: true,
-                order : get_order
+                orderId : orderId
         };
         // return {
         //     success: true,
@@ -344,10 +342,9 @@ const handleSellOrder = (data: CreateOrderPayload) => {
             } else {
                 status = OrderStatus.Open;
             }
-            const get_order = ORDER.get(orderId);
             return {
                 success: true,
-                order : get_order
+                orderId : orderId
             };
             // return {
             //     success: true,
@@ -448,7 +445,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
         
             return {
                 success: true,
-                order : get_order
+                orderId : orderId
         };
     }
 }

@@ -56,8 +56,8 @@ const handleDeleteOrder = (request: EngineRequest) => {
         }
         order.status = OrderStatus.Cancelled;
         return {
+            orderId : orderId,
             success: true,
-            message: "Order deleted successfully"
         }
     }
 }

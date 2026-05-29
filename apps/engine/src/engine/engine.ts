@@ -1,4 +1,4 @@
-import { EngineRequestOptions, type EngineRequest, type EngineResponse } from "types";
+import { EngineRequestOptions, type AddBalanceResponse, type CreateOrderResponse, type EngineRequest, type EngineResponse, type EngineResponseData } from "types";
 import { handleAddBalance } from "./balance";
 import { handleCreateOrder } from "./createOrder";
 import { handleCurrentPrice } from "./price";
@@ -12,13 +12,18 @@ const engineHandlePlease = (request : EngineRequest)=>{
             correlationId : request.correlationId,
             ok : true,
             data : res
-        } 
+        };
         return response_object
     };
 
     if (request.type == EngineRequestOptions.CreateOrder){
         const response = handleCreateOrder(request);
-        return response;
+        const response_object : EngineResponse = {
+            correlationId : request.correlationId,
+            ok : true,
+            data : response
+        }
+        return response_object;
     }
 
     if (request.type == EngineRequestOptions.CurrentPrice){
@@ -27,7 +32,12 @@ const engineHandlePlease = (request : EngineRequest)=>{
 
     if (request.type == EngineRequestOptions.CancelOrder){
         const response = handleDeleteOrder(request);
-        return response;
+        const response_object : EngineResponse = {
+            correlationId : request.correlationId,
+            ok : true,
+            data : response
+        }
+        return response_object;
     }
 }
 

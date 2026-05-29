@@ -1,6 +1,9 @@
 import BTree from 'sorted-btree'
 import type { EngineResponseData } from './src/engine_command';
 
+export * from "./src/event_stream";
+export * from "./src/engine_command";
+
 export enum EngineRequestOptions{
     CreateOrder,
     AddBalance,
