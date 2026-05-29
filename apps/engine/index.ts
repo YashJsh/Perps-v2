@@ -1,18 +1,8 @@
 
-import redis from "redis";
 import type { EngineRequest, EngineResponse } from "types";
 import { engineHandlePlease } from "./src/engine/engine";
-
-const client = redis.createClient({
-    url: "redis://localhost:6379"
-});
-
-const senderClient = redis.createClient({
-    url: "redis://localhost:6379"
-});
-
-await client.connect();
-await senderClient.connect();
+import { senderClient } from "./src/redis/engine_response";
+import { command_receiver_client } from "./src/redis/command_reciever";
 
 const sendResponse = async (data: unknown) => {
     senderClient.xAdd("engine_response", "*", {
@@ -22,7 +12,7 @@ const sendResponse = async (data: unknown) => {
 
 const main = async () => {
     while (true) {
-        const message = await client.xRead([
+        const message = await command_receiver_client.xRead([
             {
                 key: "engine_data",
                 id: "$"
@@ -38,8 +28,7 @@ const main = async () => {
         //@ts-ignore
         let data = message[0].messages[0].message.data;
         let parsedData = JSON.parse(data) as EngineRequest;
-        // console.log("DATA RECIEVED IS : ", parsedData);
-
+    
         try {
             const response = engineHandlePlease(parsedData);
             if (!response){
@@ -58,17 +47,5 @@ const main = async () => {
         }
     }
 };
+
 main();
-
-
-// let engineResponse : EngineResponse = {
-//         correlationId : "2",
-//         ok : true,
-//         data : {
-//             filled : 12,
-//             status : "OrderMatchedSuccessfully"
-//         }
-//     }
-//     client.xAdd("engine_response", "*", {
-//         response : JSON.stringify(engineResponse)
-//     });

@@ -1,4 +1,5 @@
 import BTree from 'sorted-btree'
+import type { EngineResponseData } from './src/engine_command';
 
 export enum EngineRequestOptions{
     CreateOrder,
@@ -17,7 +18,7 @@ interface EngineRequest {
 interface EngineResponse {
   correlationId: string;
   ok: boolean;
-  data?: unknown;
+  data?: EngineResponseData;
   error?: string;
 }
 
