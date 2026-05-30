@@ -2,7 +2,7 @@ import { Side, Type } from "types";
 import { POSITION } from "../store/store";
 import { handleCreateOrder } from "./createOrder";
 
-const checkLiquidation = (markPrice : number)=>{
+const checkLiquidation = (markPrice : number, streamId : string)=>{
     let pos = POSITION.values();
     //Update unrealized PNL
     pos.forEach((p)=>{
@@ -23,8 +23,8 @@ const checkLiquidation = (markPrice : number)=>{
                     quantity : p.size,
                     side : Side.Sell,
                     type : Type.Market,
-                    leverage : 0
-                })
+                    leverage : 0,
+                }, streamId)
             }else{
                 handleCreateOrder({
                     userId : p.userId,
@@ -34,7 +34,7 @@ const checkLiquidation = (markPrice : number)=>{
                     side : Side.Buy,
                     type : Type.Market,
                     leverage : 0
-                })
+                }, streamId)
             }
         }
     });

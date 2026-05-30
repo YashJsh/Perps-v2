@@ -12,18 +12,19 @@ interface BaseEvent{
     timestamp : number,
 }
 
-export enum EngineEvents{
-    OrderAccepted,
-    OrderRejected,
-    OrderCancelled,
-    TradeExecuted,
-    PositionUpdated,
-    PositionClosed,
-    BalanceUpdated,
-    BalanceAdded,
-    RealizedPnlUpated,
-    FundingPaymentEvent,
-    LiquidationTriggered,
+export enum EngineEvents {
+    OrderAccepted = "ORDER_ACCEPTED",
+    OrderRejected = "ORDER_REJECTED",
+    OrderCancelled = "ORDER_CANCELLED",
+    TradeExecuted = "TRADE_EXECUTED",
+    PositionUpdated = "POSITION_UPDATED",
+    PositionClosed = "POSITION_CLOSED",
+    BalanceUpdated = "BALANCE_UPDATED",
+    BalanceAdded = "BALANCE_ADDED",
+    RealizedPnlUpated = "REALIZED_PNL_UPDATED",
+    FundingPaymentEvent = "FUNDING_PAYMENT",
+    LiquidationTriggered = "LIQUIDATION_TRIGGERED",
+    DeleteOrderEvent = "DELETE_ORDER"
 }
 
 interface BalanceAddedEvent extends BaseEvent{
@@ -123,6 +124,12 @@ interface LiquidationTrigerredEvent extends BaseEvent{
     margin : number,
 }
 
+interface DeleteOrderEvent extends BaseEvent{
+    type : EngineEvents.DeleteOrderEvent,
+    orderId : string,
+    userId : string,
+}
+
 export type EngineEvent =
     | BalanceAddedEvent
     | BalanceUpdatedEvent
@@ -134,6 +141,7 @@ export type EngineEvent =
     | PositionClosedEvent
     | RealizedPnlUpatedEvent
     | FundingPaymentEvent
+    | DeleteOrderEvent
     | LiquidationTrigerredEvent;
 
 export type {
@@ -147,5 +155,6 @@ export type {
     PositionUpdatedEvent, 
     RealizedPnlUpatedEvent,
     TradeExecutedEvent,
-    BalanceAddedEvent
+    BalanceAddedEvent,
+    DeleteOrderEvent
 }

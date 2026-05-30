@@ -1,7 +1,7 @@
-import { OrderStatus, Side, type DeleteOrderPayload, type EngineRequest } from "types";
+import { EngineEvents, OrderStatus, Side, type CancelOrderResponse, type DeleteOrderPayload, type EngineEvent, type EngineRequest, type HandleResult, type OrderCancelledEvent, type DeleteOrderEvent} from "types";
 import { ORDER, ORDERBOOK } from "../store/store";
 
-const handleDeleteOrder = (request: EngineRequest) => {
+const handleDeleteOrder = (request: EngineRequest, streamId : string) : HandleResult<CancelOrderResponse> => {
     const payload = request.payload as DeleteOrderPayload;
     const orderId = payload.orderId;
     const userId = payload.userId;
@@ -11,7 +11,6 @@ const handleDeleteOrder = (request: EngineRequest) => {
     if (!orderbook) {
         console.log("Orderbook not found");
         throw new Error("Orderbook not found");
-        return;
     }
 
     const order = ORDER.get(orderId);
@@ -55,9 +54,20 @@ const handleDeleteOrder = (request: EngineRequest) => {
             }
         }
         order.status = OrderStatus.Cancelled;
-        return {
+        const event : DeleteOrderEvent = {
+            eventId : crypto.randomUUID(),
             orderId : orderId,
-            success: true,
+            streamId : streamId,
+            timestamp : Date.now(),
+            type : EngineEvents.DeleteOrderEvent,
+            userId : order.userId
+        } 
+        return {
+            response : {
+                orderId : orderId,
+                success : true,
+            },
+            events : [event]
         }
     }
 }
