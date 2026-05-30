@@ -1,13 +1,18 @@
 
 import type { Side, Type } from "..";
 
+export interface HandleResult<T>{
+    response : T,
+    events : EngineEvent[]
+}
+
 interface BaseEvent{
     eventId : string,
-    sequenceId : string,
+    streamId : string,
     timestamp : number,
 }
 
-enum EngineEvents{
+export enum EngineEvents{
     OrderAccepted,
     OrderRejected,
     OrderCancelled,
@@ -15,16 +20,24 @@ enum EngineEvents{
     PositionUpdated,
     PositionClosed,
     BalanceUpdated,
+    BalanceAdded,
     RealizedPnlUpated,
     FundingPaymentEvent,
     LiquidationTriggered,
+}
+
+interface BalanceAddedEvent extends BaseEvent{
+    type : EngineEvents.BalanceAdded,
+    userId : string,
+    previousBalance : number,
+    newBalance : number,
 }
 
 interface OrderAcceptedEvent extends BaseEvent{
     type : EngineEvents.OrderAccepted,
     orderId : string,
     userId : string,
-    market : Type,
+    market : string,
     side : Side,
     price : number,
     quantity : number,
@@ -44,9 +57,9 @@ interface OrderCancelledEvent extends BaseEvent{
     remaining_qty : number,
 }
 
-interface TradeExecuted extends BaseEvent{
+interface TradeExecutedEvent extends BaseEvent{
     type : EngineEvents.TradeExecuted,
-    tradeId : string,
+    //tradeId : string,
     market : string,
     makerOrderId : string,
     takerOrderId : string,
@@ -56,7 +69,7 @@ interface TradeExecuted extends BaseEvent{
     price : number,
 }
 
-interface PositionUpdated extends BaseEvent{
+interface PositionUpdatedEvent extends BaseEvent{
     type : EngineEvents.PositionUpdated,
     userId : string,
     market : string,
@@ -65,7 +78,7 @@ interface PositionUpdated extends BaseEvent{
     averageEntryPrice : number
 }
 
-interface PositionClosed extends BaseEvent{
+interface PositionClosedEvent extends BaseEvent{
     type : EngineEvents.PositionClosed,
     userId : string,
     market : string,
@@ -75,7 +88,7 @@ interface PositionClosed extends BaseEvent{
     size : number
 }
 
-interface BalanceUpdated extends BaseEvent{
+interface BalanceUpdatedEvent extends BaseEvent{
     type : EngineEvents.BalanceUpdated,
     userId : string,
     previousBalance : number,
@@ -87,7 +100,7 @@ interface BalanceUpdated extends BaseEvent{
     | "FUNDING"
 }
 
-interface RealizedPnlUpated extends BaseEvent{
+interface RealizedPnlUpatedEvent extends BaseEvent{
     type : EngineEvents.RealizedPnlUpated,
     userId : string,
     pnl : number,
@@ -101,7 +114,7 @@ interface FundingPaymentEvent extends BaseEvent{
     paymentAmount : number
 }
 
-interface LiquidationTrigerred extends BaseEvent{
+interface LiquidationTrigerredEvent extends BaseEvent{
     type : EngineEvents.LiquidationTriggered,
     userId : string,
     market : string,
@@ -110,16 +123,29 @@ interface LiquidationTrigerred extends BaseEvent{
     margin : number,
 }
 
+export type EngineEvent =
+    | BalanceAddedEvent
+    | BalanceUpdatedEvent
+    | OrderAcceptedEvent
+    | OrderRejectedEvent
+    | OrderCancelledEvent
+    | TradeExecutedEvent
+    | PositionUpdatedEvent
+    | PositionClosedEvent
+    | RealizedPnlUpatedEvent
+    | FundingPaymentEvent
+    | LiquidationTrigerredEvent;
+
 export type {
-    BalanceUpdated,
-    BaseEvent,
+    BalanceUpdatedEvent,
     FundingPaymentEvent,
-    LiquidationTrigerred,
+    LiquidationTrigerredEvent,
     OrderAcceptedEvent,
     OrderCancelledEvent,
     OrderRejectedEvent,
-    PositionClosed,
-    PositionUpdated, 
-    RealizedPnlUpated,
-    TradeExecuted,
+    PositionClosedEvent,
+    PositionUpdatedEvent, 
+    RealizedPnlUpatedEvent,
+    TradeExecutedEvent,
+    BalanceAddedEvent
 }

@@ -1,10 +1,12 @@
-import type { AddBalancePayload, EngineRequest } from "types";
+import type { AddBalancePayload, EngineRequest, BalanceAddedEvent, HandleResult, AddBalanceResponse } from "types";
+import { EngineEvents } from "types";
 import { BALANCES } from "../store/store";
-import { getAllJSDocTags } from "typescript";
+import { sendToEngineStream } from "../redis/engine_events";
 
-const handleAddBalance = (payload: unknown) => {
+const handleAddBalance = (payload: unknown, streamId: string): HandleResult<AddBalanceResponse> => {
     const data = payload as AddBalancePayload;
     const user = BALANCES.get(data.userId);
+
     if (!user) {
         console.log("User is not listed yet");
         let setBal = BALANCES.set(data.userId, {
@@ -12,25 +14,52 @@ const handleAddBalance = (payload: unknown) => {
             locked: 0
         });
         let getBal = BALANCES.get(data.userId);
-        if (!getBal){
+        if (!getBal) {
             throw new Error("User not found");
         }
-        return {
+        let addedBalanceStreamData: BalanceAddedEvent = {
+            eventId: crypto.randomUUID(),
+            streamId: streamId,
+            type: EngineEvents.BalanceAdded,
+            newBalance: getBal.available,
+            previousBalance: 0,
             userId: data.userId,
-            available : getBal.available,
-            locked : getBal.locked
+            timestamp: Date.now()
+        }
+        return {
+            response: {
+                userId: data.userId,
+                available: getBal.available,
+                locked: getBal.locked
+            },
+            events: [addedBalanceStreamData]
+
         }
     }
+    const previous_balance = user.available;
     user.available += data.amount;
-    return {
+    let addedBalanceStreamData: BalanceAddedEvent = {
+        eventId: crypto.randomUUID(),
+        streamId: streamId,
+        type: EngineEvents.BalanceAdded,
+        newBalance: user.available,
+        previousBalance: previous_balance,
         userId: data.userId,
-        available: user.available,
-        locked: user.locked
+        timestamp: Date.now()
+    }
+    //Sending this event to the engine stream;
+    return {
+        response: {
+            userId: data.userId,
+            available: user.available,
+            locked: user.locked
+        },
+        events: [addedBalanceStreamData]
     }
 }
 
-const handleBalanceChecks = ()=>{
-  
+const handleBalanceChecks = () => {
+
 }
 
 export {

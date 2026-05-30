@@ -6,4 +6,8 @@ const senderClient = redis.createClient({
 
 await senderClient.connect();
 
+
+
+
 export { senderClient };
+

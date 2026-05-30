@@ -28,9 +28,11 @@ const main = async () => {
         //@ts-ignore
         let data = message[0].messages[0].message.data;
         let parsedData = JSON.parse(data) as EngineRequest;
-    
+
+        //@ts-ignore
+        const streamId = message[0].messages[0].id;
         try {
-            const response = engineHandlePlease(parsedData);
+            const response = engineHandlePlease(parsedData, streamId);
             if (!response){
                 continue;
             }

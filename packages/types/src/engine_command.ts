@@ -1,6 +1,5 @@
 export interface CreateOrderResponse{
     orderId : string,
-    status : "OPEN" | "PARTIALLY_FILLED" | "FILLED",
     filledQty : number,
     remainingQty : number
 }

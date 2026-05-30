@@ -1,31 +1,31 @@
-import type { CreateOrderPayload, Fill, Orderbook, RestingOrder } from "types";
+import type { CreateOrderPayload, Fill, Orderbook, RestingOrder, HandleResult, CreateOrderResponse, OrderAcceptedEvent, TradeExecutedEvent, EngineEvent } from "types";
 import { FILLS, ORDER, ORDERBOOK } from "../store/store";
-import { OrderStatus, Side, Type } from "types";
+import { OrderStatus, Side, Type, EngineEvents } from "types";
 import { riskEngine } from "./risk";
 import { handleBalanceChecks } from "./balance";
 import { positionAccounting } from "./position";
-import BTree from "sorted-btree";
 
-export const handleCreateOrder = (payload: unknown) => {
+export const handleCreateOrder = (payload: unknown, streamId : string) => {
     const data = payload as CreateOrderPayload;
-    
+
     const risk = riskEngine(data);
     if (risk) {
         handleBalanceChecks();
     };
-    
+
     if (data.side == Side.Buy) {
-        const response = handleBuyOrder(data);
+        const response = handleBuyOrder(data, streamId);
         return response;
     }
     else {
-        const response = handleSellOrder(data);
+        const response = handleSellOrder(data, streamId);
         return response;
     }
 }
 
-export const handleBuyOrder = (data: CreateOrderPayload) => {
-    let orderId = crypto.randomUUID();
+export const handleBuyOrder = (data: CreateOrderPayload, streamId : string): HandleResult<CreateOrderResponse> => {
+    const event: EngineEvent[] = [];
+    const orderId = crypto.randomUUID();
     ORDER.set(orderId, {
         filledQty: 0,
         price: data.price,
@@ -40,11 +40,25 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
         userId: data.userId,
         leverage: data.leverage
     });
+    const OrderEvent: OrderAcceptedEvent = {
+        eventId: crypto.randomUUID(),
+        streamId,
+        price: data.price,
+        orderId,
+        market: data.symbol,
+        quantity: data.quantity,
+        side: data.side,
+        timestamp: Date.now(),
+        type: EngineEvents.OrderAccepted,
+        userId: data.userId,
+        leverage: data.leverage
+    }
+    event.push(OrderEvent);
 
     //Get orderbook
     const orderbook = ORDERBOOK.get(data.symbol);
     if (!orderbook) {
-        return;
+        throw new Error("Orderbook not found : CreateOrder")
     }
 
     if (data.type == Type.Limit) {
@@ -63,15 +77,31 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                     const buyerFills = FILLS.getOrInsert(orderId, []);
                     let fill_order: Fill = {
                         orderId,
-                        makerId: data.userId,
-                        takerId: sellingOrder.userId,
+                        makerId: sellingOrder?.userId,
+                        takerId: data.userId,
                         makerOrderId: orderId,
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
                         price: sellingOrder.price,
-                        marked : false,
+                        marked: false,
                     };
                     buyerFills.push(fill_order);
+
+                    //AddFillEventHere;
+                    const FillEvent: TradeExecutedEvent = {
+                        eventId: crypto.randomUUID(),
+                        streamId,
+                        makerOrderId: orderId,
+                        takerOrderId: sellingOrder.orderId,
+                        makerUserId: sellingOrder.userId,
+                        takerUserId: data.userId,
+                        market: data.symbol,
+                        type: EngineEvents.TradeExecuted,
+                        price: sellingOrder.price,
+                        quantity: matchingQty,
+                        timestamp: Date.now()
+                    }
+                    event.push(FillEvent);
 
                     const sellerFills = FILLS.getOrInsert(sellingOrder.orderId, []);
                     let seller_fill_order: Fill = {
@@ -82,7 +112,7 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
                         price: sellingOrder.price,
-                        marked : false
+                        marked: false
                     };
                     sellerFills.push(seller_fill_order);
 
@@ -91,14 +121,14 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
 
                     let buyingOrder = ORDER.get(orderId);
                     if (!buyingOrder) {
-                        return;
+                        throw new Error("Order not found");
                     }
                     buyingOrder.remainingQty -= matchingQty;
                     buyingOrder.filledQty += matchingQty;
 
                     let sellOrder = ORDER.get(sellingOrder.orderId);
                     if (!sellOrder) {
-                        return;
+                        throw new Error("Order not found");
                     }
                     sellOrder.remainingQty -= matchingQty;
                     sellOrder.filledQty += matchingQty;
@@ -128,17 +158,22 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
 
         const filledQty = data.quantity - remaining_qty;
 
-        if (remaining_qty != data?.quantity){
+        if (remaining_qty != data?.quantity) {
             positionAccounting(orderId);
         }
         console.log("Filled qty : ", filledQty);
         console.log("Remaining qty : ", remaining_qty);
-       
-        
+
+
         return {
-            success: true,
-            orderId : orderId
-        };
+            response: {
+                filledQty: filledQty,
+                orderId: orderId,
+                remainingQty: remaining_qty,
+            },
+            events: event
+
+        }
     } else {
         let remaining_qty = data.quantity;
 
@@ -161,9 +196,24 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
                         price: sellingOrder.price,
-                        marked : false,
+                        marked: false,
                     };
                     buyerFills.push(fill_order);
+
+                    const FillEvent: TradeExecutedEvent = {
+                        eventId: crypto.randomUUID(),
+                        streamId,
+                        makerOrderId: orderId,
+                        takerOrderId: sellingOrder.orderId,
+                        makerUserId: sellingOrder.userId,
+                        takerUserId: data.userId,
+                        market: data.symbol,
+                        type: EngineEvents.TradeExecuted,
+                        price: sellingOrder.price,
+                        quantity: matchingQty,
+                        timestamp: Date.now()
+                    }
+                    event.push(FillEvent);
 
                     const sellerFills = FILLS.getOrInsert(sellingOrder.orderId, []);
                     let seller_fill_order: Fill = {
@@ -174,7 +224,7 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         takerOrderId: sellingOrder.orderId,
                         filledQty: matchingQty,
                         price: sellingOrder.price,
-                        marked : false
+                        marked: false
                     };
                     sellerFills.push(seller_fill_order);
 
@@ -183,14 +233,14 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
 
                     let buyingOrder = ORDER.get(orderId);
                     if (!buyingOrder) {
-                        return;
+                        throw new Error("Order not found : createOrderResponse");
                     }
                     buyingOrder.remainingQty -= matchingQty;
                     buyingOrder.filledQty += matchingQty;
 
                     let sellOrder = ORDER.get(sellingOrder.orderId);
                     if (!sellOrder) {
-                        return;
+                        throw new Error("Sell Order not found : createOrderResponse");
                     }
                     sellOrder.remainingQty -= matchingQty;
                     sellOrder.filledQty += matchingQty;
@@ -201,19 +251,23 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
                         order.splice(i, 1);
                         i--;
                     }
-                    if (remaining_qty == 0){
+                    if (remaining_qty == 0) {
                         buyingOrder.status = OrderStatus.Filled;
                     }
                 }
             }
         }
-  
+
         positionAccounting(orderId);
-       
+
         return {
-                success: true,
-                orderId : orderId
-        };
+            response: {
+                filledQty: data.quantity - remaining_qty,
+                orderId: orderId,
+                remainingQty: remaining_qty,
+            },
+            events: event
+        }
         // return {
         //     success: true,
         //     orderId,
@@ -224,8 +278,9 @@ export const handleBuyOrder = (data: CreateOrderPayload) => {
     }
 }
 
-const handleSellOrder = (data: CreateOrderPayload) => {
-    let orderId = crypto.randomUUID();
+const handleSellOrder = (data: CreateOrderPayload, streamId : string): HandleResult<CreateOrderResponse> => {
+    const event: EngineEvent[] = [];
+    const orderId = crypto.randomUUID();
     ORDER.set(orderId, {
         filledQty: 0,
         price: data.price,
@@ -240,19 +295,28 @@ const handleSellOrder = (data: CreateOrderPayload) => {
         userId: data.userId,
         leverage: data.leverage
     });
-
+    const OrderEvent: OrderAcceptedEvent = {
+        eventId: crypto.randomUUID(),
+        streamId,
+        price: data.price,
+        orderId,
+        market: data.symbol,
+        quantity: data.quantity,
+        side: data.side,
+        timestamp: Date.now(),
+        type: EngineEvents.OrderAccepted,
+        userId: data.userId,
+        leverage: data.leverage
+    }
+    event.push(OrderEvent);
     //Get orderbook
     const orderbook = ORDERBOOK.get(data.symbol);
     if (!orderbook) {
-        return;
+        throw new Error("Orderbook not found");
     }
 
     if (data.type == Type.Limit) {
         let remaining_qty = data.quantity;
-        if (remaining_qty == 0) {
-            return;
-        }
-
         for (const [price, order] of orderbook.bids.entriesReversed()) {
             if (price >= data.price) {
                 for (let i = 0; i < order.length; i++) {
@@ -272,9 +336,24 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         takerOrderId: buyingOrder.orderId,
                         filledQty: matchingQty,
                         price: buyingOrder.price,
-                        marked : false,
+                        marked: false,
                     };
                     buyerFills.push(fill_order);
+
+                    const FillEvent: TradeExecutedEvent = {
+                        eventId: crypto.randomUUID(),
+                        streamId,
+                        makerOrderId: buyingOrder.orderId,
+                        takerOrderId: orderId,
+                        makerUserId: buyingOrder.userId,
+                        takerUserId: data.userId,
+                        market: data.symbol,
+                        type: EngineEvents.TradeExecuted,
+                        price: buyingOrder.price,
+                        quantity: matchingQty,
+                        timestamp: Date.now()
+                    }
+                    event.push(FillEvent);
 
                     const sellerFills = FILLS.getOrInsert(orderId, []);
                     let seller_fill_order: Fill = {
@@ -285,7 +364,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         takerOrderId: orderId,
                         filledQty: matchingQty,
                         price: buyingOrder.price,
-                        marked : false,
+                        marked: false,
                     };
 
                     sellerFills.push(seller_fill_order);
@@ -294,14 +373,14 @@ const handleSellOrder = (data: CreateOrderPayload) => {
 
                     let buyOrder = ORDER.get(buyingOrder.orderId);
                     if (!buyOrder) {
-                        return;
+                        throw new Error("Buy order not present");
                     }
                     buyOrder.remainingQty -= matchingQty;
                     buyOrder.filledQty += matchingQty;
 
                     let sellOrder = ORDER.get(orderId);
                     if (!sellOrder) {
-                        return;
+                        throw new Error("Sell order not present");
                     }
                     sellOrder.remainingQty -= matchingQty;
                     sellOrder.filledQty += matchingQty;
@@ -322,44 +401,38 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                     }
                 }
             }
-            let restingOrder;
-            if (remaining_qty > 0) {
-                restingOrder = addAsks(data, orderId, remaining_qty, orderbook);
-            }
+        }
+        let restingOrder;
+        if (remaining_qty > 0) {
+            restingOrder = addAsks(data, orderId, remaining_qty, orderbook);
+        }
 
-            const filledQty = data.quantity - remaining_qty;
+        const filledQty = data.quantity - remaining_qty;
 
-            if (remaining_qty != data?.quantity){
-                positionAccounting(orderId);
-            }
-            
-            let status: OrderStatus;
+        if (remaining_qty != data?.quantity) {
+            positionAccounting(orderId);
+        }
 
-            if (remaining_qty === 0) {
-                status = OrderStatus.Filled;
-            } else if (filledQty > 0) {
-                status = OrderStatus.PartiallyFilled;
-            } else {
-                status = OrderStatus.Open;
-            }
-            return {
-                success: true,
-                orderId : orderId
-            };
-            // return {
-            //     success: true,
-            //     orderId,
-            //     filledQty,
-            //     remainingQty: remaining_qty,
-            //     status
-            // };
+        let status: OrderStatus;
+
+        if (remaining_qty === 0) {
+            status = OrderStatus.Filled;
+        } else if (filledQty > 0) {
+            status = OrderStatus.PartiallyFilled;
+        } else {
+            status = OrderStatus.Open;
+        }
+        return {
+            response: {
+                filledQty: data.quantity - remaining_qty,
+                orderId: orderId,
+                remainingQty: remaining_qty,
+            },
+            events: event
         }
     }
     else {
         let remaining_qty = data.quantity;
-        if (remaining_qty == 0) {
-            return;
-        }
 
         for (const [price, order] of orderbook.bids.entriesReversed()) {
             if (price >= data.price) {
@@ -380,9 +453,24 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         takerOrderId: buyingOrder.orderId,
                         filledQty: matchingQty,
                         price: buyingOrder.price,
-                        marked : false
+                        marked: false
                     };
                     buyerFills.push(fill_order);
+
+                    const FillEvent: TradeExecutedEvent = {
+                        eventId: crypto.randomUUID(),
+                        streamId: streamId,
+                        makerOrderId: buyingOrder.orderId,
+                        takerOrderId: orderId,
+                        makerUserId: buyingOrder.userId,
+                        takerUserId: data.userId,
+                        market: data.symbol,
+                        type: EngineEvents.TradeExecuted,
+                        price: buyingOrder.price,
+                        quantity: matchingQty,
+                        timestamp: Date.now()
+                    }
+                    event.push(FillEvent);
 
                     const sellerFills = FILLS.getOrInsert(orderId, []);
                     let seller_fill_order: Fill = {
@@ -393,7 +481,7 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         takerOrderId: orderId,
                         filledQty: matchingQty,
                         price: buyingOrder.price,
-                        marked : false,
+                        marked: false,
                     };
 
                     sellerFills.push(seller_fill_order);
@@ -402,14 +490,14 @@ const handleSellOrder = (data: CreateOrderPayload) => {
 
                     let buyOrder = ORDER.get(buyingOrder.orderId);
                     if (!buyOrder) {
-                        return;
+                        throw new Error("Buy order not present");
                     }
                     buyOrder.remainingQty -= matchingQty;
                     buyOrder.filledQty += matchingQty;
 
                     let sellOrder = ORDER.get(orderId);
                     if (!sellOrder) {
-                        return;
+                        throw new Error("Sell order not present");
                     }
                     sellOrder.remainingQty -= matchingQty;
                     sellOrder.filledQty += matchingQty;
@@ -421,32 +509,27 @@ const handleSellOrder = (data: CreateOrderPayload) => {
                         i--;
                     }
 
-                    if (remaining_qty == 0){
+                    if (remaining_qty == 0) {
                         sellOrder.status = OrderStatus.Filled;
                     }
-                   
+
                 }
             }
-            
-            // return {
-            //     success: true,
-            //     orderId,
-            //     filledQty: data.quantity - remaining_qty,
-            //     remainingQty: remaining_qty,
-            //     status: remaining_qty == 0 ? OrderStatus.Filled : OrderStatus.PartiallyFilled
-            // }
         }
-
         const get_order = ORDER.get(orderId);
-        if (remaining_qty > 0 && remaining_qty < data.quantity){
+        if (remaining_qty > 0 && remaining_qty < data.quantity) {
             get_order!.status = OrderStatus.PartiallyFilled;
         }
         positionAccounting(orderId);
-        
-            return {
-                success: true,
-                orderId : orderId
-        };
+
+        return {
+            response: {
+                filledQty: data.quantity - remaining_qty,
+                orderId: orderId,
+                remainingQty: remaining_qty,
+            },
+            events: event
+        }
     }
 }
 

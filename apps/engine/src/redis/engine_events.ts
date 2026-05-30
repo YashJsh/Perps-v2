@@ -6,4 +6,14 @@ const client = redis.createClient({
 
 await client.connect();
 
-export { client as EngineEventClient};
+const sendToEngineStream = async (data : unknown)=>{
+    await client.xAdd(
+        "engine_events",
+        "*",
+        {
+            event : JSON.stringify(data)
+        }
+    )
+}
+
+export { client as EngineEventClient, sendToEngineStream};
