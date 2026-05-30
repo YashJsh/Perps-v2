@@ -1,9 +1,11 @@
-import { EngineRequestOptions, type AddBalanceResponse, type CreateOrderResponse, type EngineRequest, type EngineResponse, type HandleResult } from "types";
+import { EngineRequestOptions, type AddBalanceResponse, type CreateOrderResponse, type EngineRequest, type EngineResponse, type HandleResult, type ProceedFundingPayload } from "types";
 import { handleAddBalance } from "./balance";
 import { handleCreateOrder } from "./createOrder";
 import { handleCurrentPrice } from "./price";
 import { handleDeleteOrder } from "./deleteOrder";
 import { sendToEngineStream } from "../redis/engine_events";
+import { applyFundingRate } from "./fundingRate";
+import { LASTTRADEDPRICE, MARKPRICE } from "../store/store";
 
 const engineHandlePlease = (request: EngineRequest, streamId: string) => {
   if (request.type == EngineRequestOptions.AddBalance) {
@@ -29,7 +31,7 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
     for (const event of response.events) {
       sendToEngineStream(event);
     }
-    return response_object;
+    return response_object
   }
 
   if (request.type == EngineRequestOptions.CurrentPrice) {
@@ -48,6 +50,12 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
     }
     return response_object;
   }
+
+  if (request.type == EngineRequestOptions.ProceedFunding) {
+    const data = request.payload as ProceedFundingPayload
+    applyFundingRate(LASTTRADEDPRICE, MARKPRICE, streamId, data);
+  }
 }
 
 export { engineHandlePlease }
+

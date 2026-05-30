@@ -67,7 +67,9 @@ export const positionAccounting = (orderId: string) => {
             leverage: order.leverage,
             margin: margin,
             liquidationPrice: liquidationPrice,
-            realizedPnl: null
+            realizedPnl: null,
+            market : order.symbol,
+            side : order.side
         };
         const position = POSITION.set(order.userId + order.symbol, pos);
         console.log("Position placed successfully");
