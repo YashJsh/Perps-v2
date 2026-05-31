@@ -6,6 +6,7 @@ import { handleDeleteOrder } from "./deleteOrder";
 import { sendToEngineStream } from "../redis/engine_events";
 import { applyFundingRate } from "./fundingRate";
 import { LASTTRADEDPRICE, MARKPRICE } from "../store/store";
+import { takeSnapshot } from "./snapshot";
 
 const engineHandlePlease = (request: EngineRequest, streamId: string) => {
   if (request.type == EngineRequestOptions.AddBalance) {
@@ -54,6 +55,11 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
   if (request.type == EngineRequestOptions.ProceedFunding) {
     const data = request.payload as ProceedFundingPayload
     applyFundingRate(LASTTRADEDPRICE, MARKPRICE, streamId, data);
+  }
+
+  if (request.type == EngineRequestOptions.Snapshot) {
+    const response = takeSnapshot(streamId);
+    sendToEngineStream(response.event);
   }
 }
 

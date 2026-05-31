@@ -10,7 +10,8 @@ export enum EngineRequestOptions {
   ClosePosition,
   CurrentPrice,
   CancelOrder,
-  ProceedFunding
+  ProceedFunding,
+  Snapshot
 }
 
 interface EngineRequest {

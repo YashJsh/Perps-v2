@@ -21,9 +21,11 @@ const sendEvent = async () => {
 }
 
 const fundingEngine = () => {
-  setTimeout(() => {
-    sendEvent();
-  }, 30000)
+  while (true) {
+    setTimeout(() => {
+      sendEvent();
+    }, 30000)
+  }
 }
 
 fundingEngine();
