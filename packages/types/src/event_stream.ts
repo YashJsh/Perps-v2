@@ -28,7 +28,6 @@ export enum EngineEvents {
   SnapshotCreatedEvent = "SNAPSHOT_CREATED_EVENT"
 }
 
-
 interface SnapshotCreatedEvent extends BaseEvent {
   type: EngineEvents.SnapshotCreatedEvent,
   snapshotId: string,
@@ -49,7 +48,9 @@ interface OrderAcceptedEvent extends BaseEvent {
   side: Side,
   price: number,
   quantity: number,
-  leverage: number
+  leverage: number,
+  orderStatus: "filled" | "open" | "closed" | "cancelled" | "partially_filled",
+  orderType: Type
 }
 
 interface OrderRejectedEvent extends BaseEvent {

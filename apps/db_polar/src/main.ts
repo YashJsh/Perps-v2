@@ -1,18 +1,27 @@
-import type { EngineResponse, Order } from "types";
+import { EngineEvents, type EngineEvent, type EngineResponse, type Order } from "types";
+import { handlePositionClosed } from "./handlers/position.handler";
+import { handleAcceptedOrder, handleDeleteOrder } from "./handlers/order.handler";
+import { handleTradeExecuted } from "./handlers/trade.handler";
 
-enum DataType {
-  CreateOrderResponse,
-  DeleteOrderResponse,
+interface Data {
+  event: EngineEvent
 }
 
-interface Payload {
-  type: DataType,
-  payload: unknown
-}
+const handleData = (data: Data) => {
+  const event = data.event;
 
-
-const handleData = (data: EngineResponse) => {
-
+  if (event.type == EngineEvents.OrderAccepted) {
+    handleAcceptedOrder(event);
+  }
+  if (event.type == EngineEvents.PositionClosed) {
+    handlePositionClosed(event);
+  }
+  if (event.type == EngineEvents.DeleteOrderEvent) {
+    handleDeleteOrder(event);
+  }
+  if (event.type == EngineEvents.TradeExecuted) {
+    handleTradeExecuted(event);
+  }
 }
 
 export { handleData }
