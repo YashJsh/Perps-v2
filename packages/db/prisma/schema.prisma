@@ -13,10 +13,12 @@ datasource db {
 }
 
 model User {
-  id       String @unique @default(uuid())
-  email    String @unique
-  username String
-  password String
+  id        String     @unique @default(uuid())
+  email     String     @unique
+  username  String
+  password  String
+  orders    Order[]
+  positions Position[]
 }
 
 model Market {
@@ -28,6 +30,7 @@ model Market {
 model Order {
   id        String      @unique @default(uuid())
   userId    String
+  user      User        @relation(fields: [userId], references: [id])
   market_id String
   orderType OrderType
   quantity  Int
@@ -48,6 +51,17 @@ model Fills {
   maker_order_id String
   taker_order_id String
   createdAt      DateTime @default(now())
+}
+
+model Position {
+  id                String @unique @default(uuid())
+  userId            String
+  user              User   @relation(fields: [userId], references: [id])
+  averageEntryPrice Int
+  averageExitPrice  Int
+  pnl               Int
+  market            String
+  size              Int
 }
 
 enum OrderType {
