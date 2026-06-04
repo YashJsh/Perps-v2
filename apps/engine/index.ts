@@ -3,6 +3,7 @@ import type { EngineRequest, EngineResponse } from "types";
 import { engineHandlePlease } from "./src/engine/engine";
 import { senderClient } from "./src/redis/engine_response";
 import { command_receiver_client } from "./src/redis/command_reciever";
+import { seedOrderBook } from "./src/engine/seed";
 
 const sendResponse = async (data: unknown) => {
     senderClient.xAdd("engine_response", "*", {
@@ -11,6 +12,7 @@ const sendResponse = async (data: unknown) => {
 }
 
 const main = async () => {
+    seedOrderBook();
     while (true) {
         const message = await command_receiver_client.xRead([
             {
