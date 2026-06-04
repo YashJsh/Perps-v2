@@ -5,10 +5,11 @@ import { handleCurrentPrice } from "./price";
 import { handleDeleteOrder } from "./deleteOrder";
 import { sendToEngineStream } from "../redis/engine_events";
 import { applyFundingRate } from "./fundingRate";
-import { LASTTRADEDPRICE, MARKPRICE } from "../store/store";
+import { ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE } from "../store/store";
 import { takeSnapshot } from "./snapshot";
 
 const engineHandlePlease = (request: EngineRequest, streamId: string) => {
+  console.log("Request arrived");
   if (request.type == EngineRequestOptions.AddBalance) {
     const res = handleAddBalance(request.payload, streamId);
     const response_object: EngineResponse = {
@@ -19,11 +20,12 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
     for (const event of res.events) {
       sendToEngineStream(event);
     }
+    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
     return response_object
   };
 
   if (request.type == EngineRequestOptions.CreateOrder) {
-    const response = handleCreateOrder(request, streamId);
+    const response = handleCreateOrder(request.payload, streamId);
     const response_object: EngineResponse = {
       correlationId: request.correlationId,
       ok: true,
@@ -32,6 +34,7 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
     for (const event of response.events) {
       sendToEngineStream(event);
     }
+    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
     return response_object
   }
 
@@ -49,17 +52,20 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
     for (const event of response.events) {
       sendToEngineStream(event);
     }
+    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
     return response_object;
   }
 
   if (request.type == EngineRequestOptions.ProceedFunding) {
     const data = request.payload as ProceedFundingPayload
     applyFundingRate(LASTTRADEDPRICE, MARKPRICE, streamId, data);
+    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
   }
 
   if (request.type == EngineRequestOptions.Snapshot) {
     const response = takeSnapshot(streamId);
     sendToEngineStream(response.event);
+    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
   }
 }
 

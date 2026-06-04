@@ -6,7 +6,11 @@ const handleCurrentPrice = (request : EngineRequest)=>{
         symbol : string,
         price : number
     };
-    let markPrice = MARKPRICE.getOrInsert(payload.symbol, payload.price);
+    let markPrice = MARKPRICE.get(payload.symbol);
+    if (!markPrice){
+        MARKPRICE.set(payload.symbol, payload.price);
+        return;
+    }
     markPrice = payload.price;
     console.log("Current Price is : ", markPrice);
 }

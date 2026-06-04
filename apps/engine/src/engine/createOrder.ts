@@ -40,6 +40,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
     userId: data.userId,
     leverage: data.leverage
   });
+  
   const OrderEvent: OrderAcceptedEvent = {
     eventId: crypto.randomUUID(),
     streamId,
@@ -77,7 +78,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
 
           //Maker fill
           let buyerFills = FILLS.get(orderId);
-          if (!buyerFills){
+          if (!buyerFills) {
             FILLS.set(orderId, []);
             buyerFills = FILLS.get(orderId);
           }
@@ -109,7 +110,11 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
           }
           event.push(FillEvent);
 
-          const sellerFills = FILLS.getOrInsert(sellingOrder.orderId, []);
+          let sellerFills = FILLS.get(sellingOrder.orderId);
+          if (!sellerFills) {
+            FILLS.set(sellingOrder.orderId, []);
+            sellerFills = FILLS.get(sellingOrder.orderId);
+          }
           let seller_fill_order: Fill = {
             orderId,
             makerId: data.userId,
@@ -120,7 +125,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
             price: sellingOrder.price,
             marked: false
           };
-          sellerFills.push(seller_fill_order);
+          sellerFills?.push(seller_fill_order);
 
           //Remove the remaining qty;
           remaining_qty -= matchingQty;
@@ -184,7 +189,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
     let remaining_qty = data.quantity;
 
     for (const [price, order] of orderbook.asks.entries()) {
-      if (price <= data.price) {
+      if (price == data.price) {
         for (let i = 0; i < order.length; i++) {
           let sellingOrder = order[i];
           if (!sellingOrder) {
@@ -193,7 +198,11 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
           const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
 
           //Maker fill
-          const buyerFills = FILLS.getOrInsert(orderId, []);
+          let buyerFills = FILLS.get(orderId);
+          if (!buyerFills) {
+            FILLS.set(orderId, []);
+            buyerFills = FILLS.get(orderId);
+          }
           let fill_order: Fill = {
             orderId,
             makerId: data.userId,
@@ -204,7 +213,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
             price: sellingOrder.price,
             marked: false,
           };
-          buyerFills.push(fill_order);
+          buyerFills?.push(fill_order);
 
           const FillEvent: TradeExecutedEvent = {
             eventId: crypto.randomUUID(),
@@ -221,7 +230,11 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
           }
           event.push(FillEvent);
 
-          const sellerFills = FILLS.getOrInsert(sellingOrder.orderId, []);
+          let sellerFills = FILLS.get(sellingOrder.orderId);
+          if (!sellerFills) {
+            FILLS.set(sellingOrder.orderId, []);
+            sellerFills = FILLS.get(sellingOrder.orderId);
+          }
           let seller_fill_order: Fill = {
             orderId,
             makerId: data.userId,
@@ -232,7 +245,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
             price: sellingOrder.price,
             marked: false
           };
-          sellerFills.push(seller_fill_order);
+          sellerFills?.push(seller_fill_order);
 
           //Remove the remaining qty;
           remaining_qty -= matchingQty;
@@ -311,8 +324,8 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
     side: data.side,
     timestamp: Date.now(),
     type: EngineEvents.OrderAccepted,
-    orderStatus : "open",
-    orderType : data.type,
+    orderStatus: "open",
+    orderType: data.type,
     userId: data.userId,
     leverage: data.leverage
   }
@@ -336,7 +349,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
 
           //Maker fill
           let buyerFills = FILLS.get(buyingOrder.orderId);
-          if (!buyerFills){
+          if (!buyerFills) {
             FILLS.set(buyingOrder.orderId, []);
             buyerFills = FILLS.get(buyingOrder.orderId);
           }
@@ -368,7 +381,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
           event.push(FillEvent);
 
           let sellerFills = FILLS.get(orderId);
-          if (!sellerFills){
+          if (!sellerFills) {
             FILLS.set(orderId, []);
             sellerFills = FILLS.get(orderId);
           }
@@ -451,7 +464,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
     let remaining_qty = data.quantity;
 
     for (const [price, order] of orderbook.bids.entriesReversed()) {
-      if (price >= data.price) {
+      if (price == data.price) {
         for (let i = 0; i < order.length; i++) {
           let buyingOrder = order[i];
           if (!buyingOrder) {
@@ -461,7 +474,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
 
           //Maker fill
           let buyerFills = FILLS.get(buyingOrder.orderId);
-          if (!buyerFills){
+          if (!buyerFills) {
             FILLS.set(buyingOrder.orderId, []);
             buyerFills = FILLS.get(buyingOrder.orderId);
           }
@@ -491,8 +504,8 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
             timestamp: Date.now(),
           }
           event.push(FillEvent);
-                    let sellerFills = FILLS.get(orderId);
-          if (!sellerFills){
+          let sellerFills = FILLS.get(orderId);
+          if (!sellerFills) {
             FILLS.set(orderId, []);
             sellerFills = FILLS.get(orderId);
           }

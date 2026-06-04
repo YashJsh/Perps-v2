@@ -15,10 +15,10 @@ const applyFundingRate = (indexPriceData: Map<string, number>, markPriceData: Ma
   if (!markPrice) {
     throw new Error("Mark Price Not found");
   }
-  const fundingRate = Math.abs(markPrice - indexPrice) / indexPrice
+  const fundingRate = (markPrice - indexPrice) / indexPrice
   for (const position of POSITION) {
     let notional_value = Math.abs(position[1].size) * position[1].averageEntryPrice;
-    let funding = notional_value * Math.abs(fundingRate);
+    let funding = notional_value * fundingRate;
     let balance = BALANCES.get(position[1].userId);
     if (!balance) {
       continue;

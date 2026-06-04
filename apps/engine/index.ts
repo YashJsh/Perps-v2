@@ -28,7 +28,7 @@ const main = async () => {
         //@ts-ignore
         let data = message[0].messages[0].message.data;
         let parsedData = JSON.parse(data) as EngineRequest;
-
+        console.log("Event Recieved" , parsedData);
         //@ts-ignore
         const streamId = message[0].messages[0].id;
         try {

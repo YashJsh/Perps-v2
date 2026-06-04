@@ -51,6 +51,30 @@ export const handleAcceptedOrder = async (data: OrderAcceptedEvent) => {
 }
 
 
-export const handleDeleteOrder = (event: DeleteOrderEvent) => {
+export const handleDeleteOrder = async (event: DeleteOrderEvent) => {
+  const userId = event.userId;
+  //Find user first;
+  //
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId
+      }
+    });
 
+    if (!user) {
+      throw new Error("User not found");
+    }
+    const order = await prisma.order.update({
+      where: {
+        id: event.orderId
+      },
+      data: {
+        status: OrderStatus.Cancelled
+      }
+    });
+  }
+  catch (error) {
+    console.log("Error in cancelling Order", error);
+  }
 }

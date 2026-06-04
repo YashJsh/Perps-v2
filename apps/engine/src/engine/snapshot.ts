@@ -1,11 +1,11 @@
 import { EngineEvents, type Balance, type EngineEvent, type Order, type Orderbook, type Position, type SnapshotCreatedEvent } from "types"
-import { BALANCES, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../store/store";
+import { BALANCES, ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../store/store";
 import fs from "fs";
 import path from "path";
 
 interface SnapShot {
   streamId: string,
-  //Last processed command Id,
+  last_procccessed_command_id: string,
   snapShotId: string,
   orders: Record<string, Order>,
   orderbooks: Record<string, Orderbook>,
@@ -32,6 +32,7 @@ const takeSnapshot = (streamId: string) => {
   const snapshot: SnapShot = {
     streamId,
     snapShotId: snapshotId,
+    last_procccessed_command_id: ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID,
     orders: Object.fromEntries(ORDER),
     orderbooks: Object.fromEntries(ORDERBOOK),
     positions: Object.fromEntries(POSITION),

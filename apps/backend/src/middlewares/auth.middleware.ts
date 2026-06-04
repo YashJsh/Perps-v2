@@ -9,6 +9,7 @@ export const authMiddleware = (req : Request, res : Response, next : NextFunctio
             error : "Token not found"
         });
     }
+    console.log("request arrived");
     const rawToken = token.split("Bearer ")[1];
     if (!rawToken){
         return res.status(401).json({

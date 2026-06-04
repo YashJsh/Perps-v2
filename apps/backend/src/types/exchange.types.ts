@@ -7,7 +7,7 @@ const onRampSchema = z.object({
 
 const createOrderSchema = z.object({
     userId : z.string(),
-    symbol : z.enum(["Buy", "Sell"]),
+    symbol : z.string(),
     price : z.number(),
     quantity : z.number(),
     side : z.enum(["Buy", "Sell"]),

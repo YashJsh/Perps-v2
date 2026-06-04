@@ -1,6 +1,6 @@
 import type { AddBalancePayload, EngineRequest, BalanceAddedEvent, HandleResult, AddBalanceResponse } from "types";
 import { EngineEvents } from "types";
-import { BALANCES } from "../store/store";
+import { BALANCES, ORDERBOOK } from "../store/store";
 import { sendToEngineStream } from "../redis/engine_events";
 
 const handleAddBalance = (payload: unknown, streamId: string): HandleResult<AddBalanceResponse> => {
@@ -26,6 +26,7 @@ const handleAddBalance = (payload: unknown, streamId: string): HandleResult<AddB
             userId: data.userId,
             timestamp: Date.now()
         }
+       
         return {
             response: {
                 userId: data.userId,

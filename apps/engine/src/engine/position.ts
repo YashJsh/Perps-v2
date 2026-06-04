@@ -30,8 +30,7 @@ export const positionAccounting = (orderId: string) => {
     if (!balances) {
         throw new Error("Balance not found");
     }
-
-
+    
     let new_notional_value = 0;
     let incoming_signed_exposure = 0; // Total qty
 
@@ -130,6 +129,7 @@ export const positionAccounting = (orderId: string) => {
             return;
         }
         if (Math.abs(new_qty) > Math.abs(position.size)) {
+            //Flip case
             const closedQty =
                 Math.min(
                     Math.abs(position.size),
@@ -146,6 +146,7 @@ export const positionAccounting = (orderId: string) => {
             position.margin = Math.abs(new_qty) * exitPrice / order.leverage;
             position.liquidationPrice = order.side == Side.Buy ? buyLiquidationPrice(exitPrice, order.leverage) : sellLiquidationPrice(exitPrice, order.leverage);
             position.leverage = order.leverage;
+            position.side = position.side === Side.Buy ? Side.Sell : Side.Buy;
             return;
         }
     }

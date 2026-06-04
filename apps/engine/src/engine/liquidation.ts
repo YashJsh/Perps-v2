@@ -6,7 +6,7 @@ const checkLiquidation = (markPrice : number, streamId : string)=>{
     let pos = POSITION.values();
     //Update unrealized PNL
     pos.forEach((p)=>{
-        if (p.size > 1){
+        if (p.size > 0){
             p.realizedPnl = updateUnrealizedPnlLong(p.averageEntryPrice, p.size, markPrice);
         }else{
             p.realizedPnl = updateUnrealizedPnlShort(p.averageEntryPrice, p.size, markPrice);

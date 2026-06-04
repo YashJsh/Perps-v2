@@ -6,7 +6,7 @@ import { createToken } from "../utils/token";
 import { onRampSchema } from "../types/exchange.types";
 import { sendToEngine } from "../utils/engine_request";
 import { EngineRequestOptions } from "types";
-
+ 
 
 export const signUpController = async (req: Request, res: Response) => {
   try {
@@ -48,7 +48,7 @@ export const signUpController = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Internal Server Error"
+      error : error
     });
   }
 }
@@ -79,6 +79,7 @@ export const signInController = async (req: Request, res: Response) => {
         success: false,
         error: "Password doesn't match"
       });
+      return;
     }
 
     const token = createToken({ email: user.email, id: user.id });
@@ -104,13 +105,14 @@ export const onRamp = async (req: Request, res: Response) => {
   if (!parsed_body) {
     throw new Error("Invalid On ramp data");
   };
+  console.log("Sending to engine");
   const response = await sendToEngine(EngineRequestOptions.AddBalance, {
     userId: user_id,
     symbol: parsed_body.symbol,
     amount: parsed_body.amount,
   });
 
-  console.log("Send data to the engine");
+  console.log("Recieving response from engine");
   res.status(response.ok ? 200 : 400).json(response.ok ? response.data : {
     error: response.error,
   });

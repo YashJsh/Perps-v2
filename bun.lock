@@ -21,6 +21,7 @@
         "express": "^5.2.1",
         "jsonwebtoken": "^9.0.3",
         "redis": "^5.12.1",
+        "sorted-btree": "^2.1.0",
         "types": "workspace:*",
         "zod": "^4.4.3",
       },
