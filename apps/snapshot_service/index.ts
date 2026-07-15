@@ -15,13 +15,14 @@ const event: EngineRequest = {
 
 
 const takeSnapShotService = () => {
-  while (true) {
-    setTimeout(async () => {
-      await client.xAdd("engine-data", "*", {
-        data: JSON.stringify(event)
-      })
-    }, 60000)
-  }
-}
+  setInterval(async () => {
+    await client.xAdd("engine_data", "*", {
+      data: JSON.stringify(event),
+    });
+    console.log("Snapshot command sent");
+  }, 60000);
+};
+
+
 
 takeSnapShotService();

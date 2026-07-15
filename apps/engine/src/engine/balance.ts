@@ -6,6 +6,10 @@ const handleAddBalance = (payload: unknown, streamId: string): HandleResult<AddB
   const data = payload as AddBalancePayload;
   const user = BALANCES.get(data.userId);
 
+  if (data.amount <= 0) {
+    throw new Error("Deposit must be positive")
+  };
+
   if (!user) {
     console.log("User is not listed yet");
     let setBal = BALANCES.set(data.userId, {
