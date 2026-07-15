@@ -1,4 +1,4 @@
-import { EngineEvents, type Balance, type EngineEvent, type Order, type Orderbook, type Position, type SnapshotCreatedEvent } from "types"
+import { EngineEvents, type Balance, type Order, type Orderbook, type Position, type SnapshotCreatedEvent } from "types"
 import { BALANCES, ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../store/store";
 import fs from "fs";
 import path from "path";

@@ -1,4 +1,4 @@
-import { EngineRequestOptions, type AddBalanceResponse, type CreateOrderResponse, type EngineRequest, type EngineResponse, type HandleResult, type ProceedFundingPayload } from "types";
+import { EngineRequestOptions, type EngineRequest, type EngineResponse, type ProceedFundingPayload } from "types";
 import { handleAddBalance } from "./balance";
 import { handleCreateOrder } from "./createOrder";
 import { handleCurrentPrice } from "./price";

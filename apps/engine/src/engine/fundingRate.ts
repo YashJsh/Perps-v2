@@ -1,10 +1,5 @@
 import { EngineEvents, Side, type FundingPaymentEvent, type ProceedFundingPayload } from "types";
 import { BALANCES, POSITION } from "../store/store";
-import { positionAccounting } from "./position";
-
-interface ApplyFundingPayload {
-  symbol: string,
-}
 
 const applyFundingRate = (indexPriceData: Map<string, number>, markPriceData: Map<string, number>, streamId: string, data: ProceedFundingPayload) => {
   const indexPrice = indexPriceData.get(data.symbol);
