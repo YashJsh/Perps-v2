@@ -10,7 +10,7 @@ export const handleCreateOrder = (payload: unknown, streamId: string) => {
 
   const risk = riskEngine(data);
   if (risk) {
-    handleBalanceChecks();
+    handleBalanceChecks(data.userId, data.quantity, data.price, data.leverage);
   };
 
   if (data.side == Side.Buy) {
@@ -40,7 +40,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
     userId: data.userId,
     leverage: data.leverage
   });
-  
+
   const OrderEvent: OrderAcceptedEvent = {
     eventId: crypto.randomUUID(),
     streamId,
