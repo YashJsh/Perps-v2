@@ -107,7 +107,7 @@ export const positionAccounting = (orderId: string) => {
       position.realizedPnl = (position.realizedPnl ?? 0) + calculatePnl;
       balances.available += calculatePnl + balances.locked;
       balances.locked -= position.margin;
-
+      POSITION.delete(order.userId + order.symbol);
       return;
     }
     if (Math.abs(new_qty) < Math.abs(position.size)) {
@@ -144,6 +144,7 @@ export const positionAccounting = (orderId: string) => {
       position.size = new_qty;
       position.averageEntryPrice = exitPrice;
       position.margin = Math.abs(new_qty) * exitPrice / order.leverage;
+      balances.locked += position.margin;
       position.liquidationPrice = order.side == Side.Buy ? buyLiquidationPrice(exitPrice, order.leverage) : sellLiquidationPrice(exitPrice, order.leverage);
       position.leverage = order.leverage;
       position.side = position.side === Side.Buy ? Side.Sell : Side.Buy;
