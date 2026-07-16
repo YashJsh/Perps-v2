@@ -54,7 +54,7 @@ export const positionAccounting = (orderId: string) => {
   const position = POSITION.get(order.userId + order.symbol);
   if (!position) {
     //Create a fresh one:
-    const entryPrice = new_notional_value / incoming_signed_exposure;
+    const entryPrice = new_notional_value / Math.abs(incoming_signed_exposure);
     const margin = new_notional_value / order.leverage;
     const liquidationPrice = order.side == Side.Buy ? buyLiquidationPrice(entryPrice, order.leverage) : sellLiquidationPrice(entryPrice, order.leverage);
 
@@ -100,51 +100,52 @@ export const positionAccounting = (orderId: string) => {
     //3. Flip the position.
     const new_qty = position.size + incoming_signed_exposure;
     if (new_qty == 0) {
-      //Case 1;
-      const exitPrice = new_notional_value / Math.abs(incoming_signed_exposure)
-      const calculatePnl = position.size > 0 ? updateRealizedPnlLong(position.averageEntryPrice, position.size, exitPrice) : updateRealizedPnlShort(position.averageEntryPrice, position.size, exitPrice);
+      //Case 1: Complete Close
+      const exitPrice = new_notional_value / Math.abs(incoming_signed_exposure);
+      const calculatePnl = position.size > 0 ? updateRealizedPnlLong(position.averageEntryPrice, position.size, exitPrice) : updateRealizedPnlShort(position.averageEntryPrice, Math.abs(position.size), exitPrice);
 
       position.realizedPnl = (position.realizedPnl ?? 0) + calculatePnl;
-      balances.available += calculatePnl + balances.locked;
+      balances.available += calculatePnl + position.margin;
       balances.locked -= position.margin;
       POSITION.delete(order.userId + order.symbol);
       return;
     }
-    if (Math.abs(new_qty) < Math.abs(position.size)) {
-      //Case 2 : 
-      //Reduce some qty case : 
+    else if (Math.sign(new_qty) === Math.sign(position.size)) {
+      //Case 2: Reduce some qty case (sign stays the same)
       // Here reduce qty only. Entry price will remain same. Only margin will change.
       const closedQty =
         Math.min(
           Math.abs(position.size),
           Math.abs(incoming_signed_exposure)
-        )
-      const exitPrice = new_notional_value / Math.abs(incoming_signed_exposure)
+        );
+      const exitPrice = new_notional_value / Math.abs(incoming_signed_exposure);
       const calculatePnl = position.size > 0 ? updateRealizedPnlLong(position.averageEntryPrice, closedQty, exitPrice) : updateRealizedPnlShort(position.averageEntryPrice, closedQty, exitPrice);
 
+      position.realizedPnl = (position.realizedPnl ?? 0) + calculatePnl;
       balances.available += calculatePnl;
       position.size = new_qty;
       const new_notional = position.averageEntryPrice * Math.abs(position.size);
       position.margin = new_notional / order.leverage;
       return;
     }
-    if (Math.abs(new_qty) > Math.abs(position.size)) {
-      //Flip case
-      const closedQty =
-        Math.min(
-          Math.abs(position.size),
-          Math.abs(incoming_signed_exposure)
-        )
-
-      const exitPrice = new_notional_value / Math.abs(incoming_signed_exposure)
+    else {
+      //Case 3: Flip case (sign changes)
+      const closedQty = Math.abs(position.size);
+      const exitPrice = new_notional_value / Math.abs(incoming_signed_exposure);
       const pnl = position.size > 0 ? updateRealizedPnlLong(position.averageEntryPrice, closedQty, exitPrice) : updateRealizedPnlShort(position.averageEntryPrice, closedQty, exitPrice);
-      balances.available += pnl;
+      
+      balances.available += pnl + position.margin;
       balances.locked -= position.margin;
+
+      const remainingQty = Math.abs(new_qty);
+      const newMargin = (remainingQty * exitPrice) / order.leverage;
+
+      balances.available -= newMargin;
+      balances.locked += newMargin;
 
       position.size = new_qty;
       position.averageEntryPrice = exitPrice;
-      position.margin = Math.abs(new_qty) * exitPrice / order.leverage;
-      balances.locked += position.margin;
+      position.margin = newMargin;
       position.liquidationPrice = order.side == Side.Buy ? buyLiquidationPrice(exitPrice, order.leverage) : sellLiquidationPrice(exitPrice, order.leverage);
       position.leverage = order.leverage;
       position.side = position.side === Side.Buy ? Side.Sell : Side.Buy;

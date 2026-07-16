@@ -150,11 +150,12 @@ describe("balance management", () => {
   });
 
   test("handles negative deposit amounts", () => {
-    const result = handleAddBalance(
-      { userId: "bob", symbol: SYMBOL, amount: -100 },
-      STREAM_ID,
-    );
-    expect(result.response.available).toBe(-100);
+    expect(() =>
+      handleAddBalance(
+        { userId: "bob", symbol: SYMBOL, amount: -100 },
+        STREAM_ID,
+      )
+    ).toThrow("Deposit must be positive");
   });
 
   test("creates balance for multiple users independently", () => {
@@ -509,19 +510,17 @@ describe("order cancellation", () => {
     seedRestingBid({ userId: "owner" });
     const order = getSingleOrder();
 
-    // Should fail because userId doesn't match but currently it doesn't check
-    const result = handleDeleteOrder(
-      {
-        correlationId: "cancel-wrong-user",
-        type: EngineRequestOptions.CancelOrder,
-        payload: { userId: "attacker", orderId: order.orderId, symbol: SYMBOL },
-      },
-      STREAM_ID,
-    );
+    expect(() =>
+      handleDeleteOrder(
+        {
+          correlationId: "cancel-wrong-user",
+          type: EngineRequestOptions.CancelOrder,
+          payload: { userId: "attacker", orderId: order.orderId, symbol: SYMBOL },
+        },
+        STREAM_ID,
+      )
+    ).toThrow("Ownership of order required for deleting the order");
 
-    // BUG: no authorization check in deleteOrder — anyone can cancel anyone's order
-    // The function matches by userId in splice, so if userId doesn't match,
-    // the for loop won't find and splice the order, but the status still gets set to Cancelled
     expect(order.status).not.toBe(OrderStatus.Cancelled);
   });
 });
@@ -887,8 +886,8 @@ describe("position accounting", () => {
     positionAccounting("flip-order");
 
     expect(BALANCES.get("trader")).toEqual({
-      available: 980,
-      locked: 30,
+      available: 973,
+      locked: 57,
     });
     const position = POSITION.get(`trader${SYMBOL}`);
     expect(position).toMatchObject({
@@ -1226,14 +1225,7 @@ describe("engine dispatcher", () => {
       payload: { userId: "buyer", symbol: SYMBOL, price: 105, quantity: 2, side: Side.Buy, type: Type.Limit, leverage: 5 },
     };
 
-    // BUG: engine.ts line 26 passes `request` (EngineRequest) instead of `request.payload`
-    // handleCreateOrder casts to CreateOrderPayload, so all fields will be undefined
-    const result = handleCreateOrder(badRequest, STREAM_ID);
-
-    // The order will be created but with undefined userId, so it won't match
-    // the resting ask and will just rest on the book unfilled
-    expect(result.response.filledQty).toBe(0);
-    expect(result.response.remainingQty).toBe(2);
+    expect(() => handleCreateOrder(badRequest, STREAM_ID)).toThrow();
   });
 });
 
@@ -1243,7 +1235,7 @@ describe("engine dispatcher", () => {
 describe("margin validation", () => {
   test("rejects order when user has insufficient balance for margin", () => {
     // User has 0 balance
-    handleAddBalance({ userId: "trader", symbol: SYMBOL, amount: 0 }, STREAM_ID);
+    BALANCES.set("trader", { available: 0, locked: 0 });
 
     expect(() =>
       handleCreateOrder(

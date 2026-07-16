@@ -6,38 +6,37 @@ const checkLiquidation = (markPrice: number, streamId: string) => {
   let pos = POSITION.values();
   //Update unrealized PNL
   pos.forEach((p) => {
+    if (Math.abs(p.size) <= 0) {
+      return;
+    }
     if (p.size > 0) {
       p.realizedPnl = updateUnrealizedPnlLong(p.averageEntryPrice, p.size, markPrice);
     } else {
       p.realizedPnl = updateUnrealizedPnlShort(p.averageEntryPrice, p.size, markPrice);
     }
-    const buffer = p.liquidationPrice * 0.1;
-    const bufferedPrice = p.side === Side.Buy
-      ? p.liquidationPrice + buffer   // long: buffer above liq price
-      : p.liquidationPrice - buffer;  // short: buffer below liq price
-    if (bufferedPrice <= markPrice) {
+    const isLiquidatable = p.side === Side.Buy
+      ? markPrice <= p.liquidationPrice
+      : markPrice >= p.liquidationPrice;
+
+    if (isLiquidatable) {
       //Send request to engine for the orderCreation. 
       const closeSide = p.side === Side.Buy ? Side.Sell : Side.Buy;
-      if (closeSide == Side.Buy) {
-        handleCreateOrder({
-          userId: p.userId,
-          symbol: p.symbol,
-          price: markPrice, //We need to give the current price here
-          quantity: p.size,
-          side: Side.Sell,
-          type: Type.Market,
-          leverage: 0,
-        }, streamId)
-      } else {
+      try {
         handleCreateOrder({
           userId: p.userId,
           symbol: p.symbol,
           price: markPrice,
-          quantity: p.size,
-          side: Side.Buy,
+          quantity: Math.abs(p.size),
+          side: closeSide,
           type: Type.Market,
-          leverage: 0
-        }, streamId)
+          leverage: p.leverage
+        }, streamId);
+      } catch (err) {
+        if (err instanceof Error && err.message === "No fills found for order") {
+          // Ignore - expected when there is no matching liquidity to fill the liquidation order immediately
+        } else {
+          throw err;
+        }
       }
     }
   });
@@ -48,7 +47,7 @@ const updateUnrealizedPnlLong = (entryPrice: number, size: number, markPrice: nu
 };
 
 const updateUnrealizedPnlShort = (entryPrice: number, size: number, markPrice: number) => {
-  return (entryPrice - markPrice) * size;
+  return (entryPrice - markPrice) * Math.abs(size);
 };
 
 export {

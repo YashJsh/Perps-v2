@@ -18,19 +18,21 @@ const applyFundingRate = (indexPriceData: Map<string, number>, markPriceData: Ma
     if (!balance) {
       continue;
     }
+    const absoluteFunding = Math.abs(funding);
     if (fundingRate > 0) {
       //Long will pay shorts
       if (position[1].side == Side.Buy) {
-        balance.available -= funding;
+        balance.available -= absoluteFunding;
       } else {
-        balance.available += funding;
+        balance.available += absoluteFunding;
       }
     }
-    else {
+    else if (fundingRate < 0) {
+      //Short will pay longs
       if (position[1].side == Side.Sell) {
-        balance.available -= funding;
+        balance.available -= absoluteFunding;
       } else {
-        balance.available += funding;
+        balance.available += absoluteFunding;
       }
     }
     const event: FundingPaymentEvent = {
@@ -38,7 +40,7 @@ const applyFundingRate = (indexPriceData: Map<string, number>, markPriceData: Ma
       userId: position[0],
       fundingRate: fundingRate,
       market: position[1].market,
-      paymentAmount: funding,
+      paymentAmount: absoluteFunding,
       streamId,
       timestamp: Date.now(),
       type: EngineEvents.FundingPaymentEvent

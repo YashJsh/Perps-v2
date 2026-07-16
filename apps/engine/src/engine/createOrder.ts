@@ -189,94 +189,98 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
     let remaining_qty = data.quantity;
 
     for (const [price, order] of orderbook.asks.entries()) {
-      if (price == data.price) {
-        for (let i = 0; i < order.length; i++) {
-          let sellingOrder = order[i];
-          if (!sellingOrder) {
-            continue;
-          }
-          const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
+      if (remaining_qty <= 0) {
+        break;
+      }
+      for (let i = 0; i < order.length; i++) {
+        let sellingOrder = order[i];
+        if (!sellingOrder) {
+          continue;
+        }
+        const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
 
-          //Maker fill
-          let buyerFills = FILLS.get(orderId);
-          if (!buyerFills) {
-            FILLS.set(orderId, []);
-            buyerFills = FILLS.get(orderId);
-          }
-          let fill_order: Fill = {
-            orderId,
-            makerId: data.userId,
-            takerId: sellingOrder.userId,
-            makerOrderId: orderId,
-            takerOrderId: sellingOrder.orderId,
-            filledQty: matchingQty,
-            price: sellingOrder.price,
-            marked: false,
-          };
-          buyerFills?.push(fill_order);
+        //Maker fill
+        let buyerFills = FILLS.get(orderId);
+        if (!buyerFills) {
+          FILLS.set(orderId, []);
+          buyerFills = FILLS.get(orderId);
+        }
+        let fill_order: Fill = {
+          orderId,
+          makerId: data.userId,
+          takerId: sellingOrder.userId,
+          makerOrderId: orderId,
+          takerOrderId: sellingOrder.orderId,
+          filledQty: matchingQty,
+          price: sellingOrder.price,
+          marked: false,
+        };
+        buyerFills?.push(fill_order);
 
-          const FillEvent: TradeExecutedEvent = {
-            eventId: crypto.randomUUID(),
-            streamId,
-            makerOrderId: orderId,
-            takerOrderId: sellingOrder.orderId,
-            makerUserId: sellingOrder.userId,
-            takerUserId: data.userId,
-            market: data.symbol,
-            type: EngineEvents.TradeExecuted,
-            price: sellingOrder.price,
-            quantity: matchingQty,
-            timestamp: Date.now()
-          }
-          event.push(FillEvent);
+        const FillEvent: TradeExecutedEvent = {
+          eventId: crypto.randomUUID(),
+          streamId,
+          makerOrderId: orderId,
+          takerOrderId: sellingOrder.orderId,
+          makerUserId: sellingOrder.userId,
+          takerUserId: data.userId,
+          market: data.symbol,
+          type: EngineEvents.TradeExecuted,
+          price: sellingOrder.price,
+          quantity: matchingQty,
+          timestamp: Date.now()
+        }
+        event.push(FillEvent);
 
-          let sellerFills = FILLS.get(sellingOrder.orderId);
-          if (!sellerFills) {
-            FILLS.set(sellingOrder.orderId, []);
-            sellerFills = FILLS.get(sellingOrder.orderId);
-          }
-          let seller_fill_order: Fill = {
-            orderId,
-            makerId: data.userId,
-            takerId: sellingOrder.userId,
-            makerOrderId: orderId,
-            takerOrderId: sellingOrder.orderId,
-            filledQty: matchingQty,
-            price: sellingOrder.price,
-            marked: false
-          };
-          sellerFills?.push(seller_fill_order);
+        let sellerFills = FILLS.get(sellingOrder.orderId);
+        if (!sellerFills) {
+          FILLS.set(sellingOrder.orderId, []);
+          sellerFills = FILLS.get(sellingOrder.orderId);
+        }
+        let seller_fill_order: Fill = {
+          orderId,
+          makerId: data.userId,
+          takerId: sellingOrder.userId,
+          makerOrderId: orderId,
+          takerOrderId: sellingOrder.orderId,
+          filledQty: matchingQty,
+          price: sellingOrder.price,
+          marked: false
+        };
+        sellerFills?.push(seller_fill_order);
 
-          //Remove the remaining qty;
-          remaining_qty -= matchingQty;
+        //Remove the remaining qty;
+        remaining_qty -= matchingQty;
 
-          let buyingOrder = ORDER.get(orderId);
-          if (!buyingOrder) {
-            throw new Error("Order not found : createOrderResponse");
-          }
-          buyingOrder.remainingQty -= matchingQty;
-          buyingOrder.filledQty += matchingQty;
+        let buyingOrder = ORDER.get(orderId);
+        if (!buyingOrder) {
+          throw new Error("Order not found : createOrderResponse");
+        }
+        buyingOrder.remainingQty -= matchingQty;
+        buyingOrder.filledQty += matchingQty;
 
-          let sellOrder = ORDER.get(sellingOrder.orderId);
-          if (!sellOrder) {
-            throw new Error("Sell Order not found : createOrderResponse");
-          }
-          sellOrder.remainingQty -= matchingQty;
-          sellOrder.filledQty += matchingQty;
+        let sellOrder = ORDER.get(sellingOrder.orderId);
+        if (!sellOrder) {
+          throw new Error("Sell Order not found : createOrderResponse");
+        }
+        sellOrder.remainingQty -= matchingQty;
+        sellOrder.filledQty += matchingQty;
 
-          if (sellOrder.remainingQty == 0) {
-            //Remove the orderfrom the book;
-            sellOrder.status = OrderStatus.Filled;
-            order.splice(i, 1);
-            i--;
-          }
-          if (remaining_qty == 0) {
-            buyingOrder.status = OrderStatus.Filled;
-          }
+        if (sellOrder.remainingQty == 0) {
+          //Remove the orderfrom the book;
+          sellOrder.status = OrderStatus.Filled;
+          order.splice(i, 1);
+          i--;
+        }
+        if (remaining_qty == 0) {
+          buyingOrder.status = OrderStatus.Filled;
         }
       }
     }
 
+    if (remaining_qty == data.quantity) {
+      throw new Error("No fills found for order");
+    }
     positionAccounting(orderId);
 
     return {
@@ -464,98 +468,102 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
     let remaining_qty = data.quantity;
 
     for (const [price, order] of orderbook.bids.entriesReversed()) {
-      if (price == data.price) {
-        for (let i = 0; i < order.length; i++) {
-          let buyingOrder = order[i];
-          if (!buyingOrder) {
-            continue;
-          }
-          const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
-
-          //Maker fill
-          let buyerFills = FILLS.get(buyingOrder.orderId);
-          if (!buyerFills) {
-            FILLS.set(buyingOrder.orderId, []);
-            buyerFills = FILLS.get(buyingOrder.orderId);
-          }
-          let fill_order: Fill = {
-            orderId,
-            makerId: data.userId,
-            takerId: buyingOrder.userId,
-            makerOrderId: orderId,
-            takerOrderId: buyingOrder.orderId,
-            filledQty: matchingQty,
-            price: buyingOrder.price,
-            marked: false
-          };
-          buyerFills?.push(fill_order);
-
-          const FillEvent: TradeExecutedEvent = {
-            eventId: crypto.randomUUID(),
-            streamId: streamId,
-            makerOrderId: buyingOrder.orderId,
-            takerOrderId: orderId,
-            makerUserId: buyingOrder.userId,
-            takerUserId: data.userId,
-            market: data.symbol,
-            type: EngineEvents.TradeExecuted,
-            price: buyingOrder.price,
-            quantity: matchingQty,
-            timestamp: Date.now(),
-          }
-          event.push(FillEvent);
-          let sellerFills = FILLS.get(orderId);
-          if (!sellerFills) {
-            FILLS.set(orderId, []);
-            sellerFills = FILLS.get(orderId);
-          }
-          let seller_fill_order: Fill = {
-            orderId,
-            makerId: buyingOrder?.userId,
-            takerId: data.userId,
-            makerOrderId: buyingOrder?.orderId,
-            takerOrderId: orderId,
-            filledQty: matchingQty,
-            price: buyingOrder.price,
-            marked: false,
-          };
-
-          sellerFills?.push(seller_fill_order);
-
-          //Remove the remaining qty;
-          remaining_qty -= matchingQty;
-
-          let buyOrder = ORDER.get(buyingOrder.orderId);
-          if (!buyOrder) {
-            throw new Error("Buy order not present");
-          }
-          buyOrder.remainingQty -= matchingQty;
-          buyOrder.filledQty += matchingQty;
-
-          let sellOrder = ORDER.get(orderId);
-          if (!sellOrder) {
-            throw new Error("Sell order not present");
-          }
-          sellOrder.remainingQty -= matchingQty;
-          sellOrder.filledQty += matchingQty;
-
-          if (buyOrder.remainingQty == 0) {
-            //Remove the orderfrom the book;
-            buyOrder.status = OrderStatus.Filled;
-            order.splice(i, 1);
-            i--;
-          }
-
-          if (remaining_qty == 0) {
-            sellOrder.status = OrderStatus.Filled;
-          }
-
+      if (remaining_qty <= 0) {
+        break;
+      }
+      for (let i = 0; i < order.length; i++) {
+        let buyingOrder = order[i];
+        if (!buyingOrder) {
+          continue;
         }
+        const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
+
+        //Maker fill
+        let buyerFills = FILLS.get(buyingOrder.orderId);
+        if (!buyerFills) {
+          FILLS.set(buyingOrder.orderId, []);
+          buyerFills = FILLS.get(buyingOrder.orderId);
+        }
+        let fill_order: Fill = {
+          orderId,
+          makerId: data.userId,
+          takerId: buyingOrder.userId,
+          makerOrderId: orderId,
+          takerOrderId: buyingOrder.orderId,
+          filledQty: matchingQty,
+          price: buyingOrder.price,
+          marked: false
+        };
+        buyerFills?.push(fill_order);
+
+        const FillEvent: TradeExecutedEvent = {
+          eventId: crypto.randomUUID(),
+          streamId: streamId,
+          makerOrderId: buyingOrder.orderId,
+          takerOrderId: orderId,
+          makerUserId: buyingOrder.userId,
+          takerUserId: data.userId,
+          market: data.symbol,
+          type: EngineEvents.TradeExecuted,
+          price: buyingOrder.price,
+          quantity: matchingQty,
+          timestamp: Date.now(),
+        }
+        event.push(FillEvent);
+        let sellerFills = FILLS.get(orderId);
+        if (!sellerFills) {
+          FILLS.set(orderId, []);
+          sellerFills = FILLS.get(orderId);
+        }
+        let seller_fill_order: Fill = {
+          orderId,
+          makerId: buyingOrder?.userId,
+          takerId: data.userId,
+          makerOrderId: buyingOrder?.orderId,
+          takerOrderId: orderId,
+          filledQty: matchingQty,
+          price: buyingOrder.price,
+          marked: false,
+        };
+
+        sellerFills?.push(seller_fill_order);
+
+        //Remove the remaining qty;
+        remaining_qty -= matchingQty;
+
+        let buyOrder = ORDER.get(buyingOrder.orderId);
+        if (!buyOrder) {
+          throw new Error("Buy order not present");
+        }
+        buyOrder.remainingQty -= matchingQty;
+        buyOrder.filledQty += matchingQty;
+
+        let sellOrder = ORDER.get(orderId);
+        if (!sellOrder) {
+          throw new Error("Sell order not present");
+        }
+        sellOrder.remainingQty -= matchingQty;
+        sellOrder.filledQty += matchingQty;
+
+        if (buyOrder.remainingQty == 0) {
+          //Remove the orderfrom the book;
+          buyOrder.status = OrderStatus.Filled;
+          order.splice(i, 1);
+          i--;
+        }
+
+        if (remaining_qty == 0) {
+          sellOrder.status = OrderStatus.Filled;
+        }
+
       }
     }
     const get_order = ORDER.get(orderId);
     if (remaining_qty > 0 && remaining_qty < data.quantity) {
       get_order!.status = OrderStatus.PartiallyFilled;
+    }
+    if (remaining_qty == data.quantity) {
+      throw new Error("No fills found for order");
     }
     positionAccounting(orderId);
 
