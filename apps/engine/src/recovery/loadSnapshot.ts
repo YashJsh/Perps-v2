@@ -1,8 +1,8 @@
 import path from "path";
 import fs from "fs";
 
-export const LoadSnapShot = ()=>{
-    const snapShotDir = path.resolve(__dirname, "../../../snapshots");
+export const loadLatestSnapShot = ()=>{
+    const snapShotDir = path.resolve(__dirname, "../../snapshots");
     if (!fs.existsSync(snapShotDir)){
         return null;
     }
