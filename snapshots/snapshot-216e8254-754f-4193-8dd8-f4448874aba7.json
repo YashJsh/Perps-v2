@@ -1,0 +1,133 @@
+{
+  "streamId": "snapshot-test-stream",
+  "snapShotId": "216e8254-754f-4193-8dd8-f4448874aba7",
+  "last_procccessed_command_id": "abc-123",
+  "orders": {
+    "snap-order-1": {
+      "orderId": "snap-order-1",
+      "userId": "snap-user",
+      "status": 1,
+      "side": 0,
+      "type": 1,
+      "quantity": 2,
+      "filledQty": 2,
+      "remainingQty": 0,
+      "price": 50000,
+      "symbol": "BTC-USD",
+      "timestamp": 1784316013143,
+      "leverage": 10
+    }
+  },
+  "orderbooks": {
+    "BTC-USD": {
+      "asks": {
+        "_root": {
+          "keys": [],
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "isShared": true
+        },
+        "_maxNodeSize": 32
+      },
+      "bids": {
+        "_root": {
+          "keys": [],
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "isShared": true
+        },
+        "_maxNodeSize": 32
+      }
+    }
+  },
+  "positions": {
+    "snap-userBTC-USD": {
+      "userId": "snap-user",
+      "symbol": "BTC-USD",
+      "size": 2,
+      "side": 0,
+      "averageEntryPrice": 50000,
+      "liquidationPrice": 45000,
+      "leverage": 10,
+      "margin": 10000,
+      "realizedPnl": 200,
+      "market": "BTC-USD"
+    }
+  },
+  "balances": {
+    "snap-user": {
+      "available": 10000,
+      "locked": 500
+    }
+  },
+  "MarkPrices": {
+    "BTC-USD": 50250
+  },
+  "IndexPrice": {
+    "BTC-USD": 50100
+  }
+}

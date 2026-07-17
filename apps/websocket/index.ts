@@ -18,7 +18,7 @@ const sendToEngine = async (symbol : string, price : number)=>{
             price
         }
     };
-    await client.xAdd("engine_data", "*", {
+    await client.xAdd("engine:requests", "*", {
         data : JSON.stringify(data)
     })
     return;

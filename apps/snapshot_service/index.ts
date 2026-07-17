@@ -16,7 +16,7 @@ const event: EngineRequest = {
 
 const takeSnapShotService = () => {
   setInterval(async () => {
-    await client.xAdd("engine_data", "*", {
+    await client.xAdd("engine:requests", "*", {
       data: JSON.stringify(event),
     });
     console.log("Snapshot command sent");

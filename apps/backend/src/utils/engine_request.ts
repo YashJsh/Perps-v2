@@ -30,7 +30,7 @@ export const sendToEngine = async (type: EngineRequestOptions, payload: Record<s
     };
 
     let response_promise = waitForResponse(correlation_id);
-    const id = await publisherClient.xAdd("engine_data", "*", {
+    const id = await publisherClient.xAdd("engine:requests", "*", {
         data : JSON.stringify(message)
     })
     console.log("Published:", id);
@@ -51,7 +51,7 @@ export const listenForResponses = async ()=>{
     for (;;){
         const message = await subscriberClient.xRead([
             {
-                key: "engine_response",
+                key: "engine:responses",
                 id: "$"
             },
         ], {

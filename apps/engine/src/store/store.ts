@@ -1,6 +1,4 @@
-import type BTree from "sorted-btree";
-import type { Balance, Fill, Order, Orderbook, Position } from "types"; 
-
+import type { Balance, Fill, Order, Orderbook, Position, RestingOrder } from "types";
 
 export const ORDERBOOK = new Map<string, Orderbook>();
 export const ORDER = new Map<string, Order>();

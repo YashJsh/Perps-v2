@@ -8,7 +8,13 @@ import { applyFundingRate } from "./fundingRate";
 import { ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE } from "../store/store";
 import { takeSnapshot } from "./snapshot";
 
-const engineHandlePlease = (request: EngineRequest, streamId: string) => {
+const engineHandlePlease = (
+  request: EngineRequest,
+  streamId: string,
+  context?: { isReplay?: boolean }
+) => {
+  const isReplay = context?.isReplay ?? false;
+
   console.log("Request arrived");
   if (request.type == EngineRequestOptions.AddBalance) {
     const res = handleAddBalance(request.payload, streamId);
@@ -17,9 +23,14 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
       ok: true,
       data: res.response
     };
-    for (const event of res.events) {
-      sendToEngineStream(event);
+
+    if (!isReplay) {
+      for (const event of res.events) {
+        sendToEngineStream(event);
+      }
     }
+
+
     ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
     return response_object
   };
@@ -31,9 +42,12 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
       ok: true,
       data: response.response
     }
-    for (const event of response.events) {
-      sendToEngineStream(event);
+    if (!isReplay) {
+      for (const event of response.events) {
+        sendToEngineStream(event);
+      }
     }
+
     ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
     return response_object
   }
@@ -49,9 +63,12 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
       ok: true,
       data: response.response
     }
-    for (const event of response.events) {
+    if (!isReplay){
+       for (const event of response.events) {
       sendToEngineStream(event);
     }
+    }
+   
     ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
     return response_object;
   }
@@ -64,7 +81,9 @@ const engineHandlePlease = (request: EngineRequest, streamId: string) => {
 
   if (request.type == EngineRequestOptions.Snapshot) {
     const response = takeSnapshot(streamId);
-    sendToEngineStream(response.event);
+    if (!isReplay){
+      sendToEngineStream(response.event);
+    }
     ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
   }
 }

@@ -15,17 +15,20 @@ const sendEvent = async () => {
       symbol: "BTC"
     },
   };
-  await client.xAdd("engine_data", "*", {
+  await client.xAdd("engine:requests", "*", {
     data: JSON.stringify(message)
   })
 }
 
 const fundingEngine = () => {
-  while (true) {
-    setTimeout(() => {
-      sendEvent();
-    }, 30000)
-  }
-}
+  setInterval(async () => {
+    try {
+      await sendEvent();
+    } catch (err) {
+      console.error("Failed to send funding event:", err);
+    }
+  }, 30000);
+};
+
 
 fundingEngine();

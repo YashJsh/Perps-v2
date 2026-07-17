@@ -13,14 +13,14 @@ import {
   type RestingOrder,
   type EngineRequest,
 } from "types";
-import { handleAddBalance } from "../src/engine/balance";
-import { handleCreateOrder } from "../src/engine/createOrder";
-import { handleDeleteOrder } from "../src/engine/deleteOrder";
-import { positionAccounting } from "../src/engine/position";
-import { riskEngine } from "../src/engine/risk";
-import { applyFundingRate } from "../src/engine/fundingRate";
-import { checkLiquidation } from "../src/engine/liquidation";
-import { handleCurrentPrice } from "../src/engine/price";
+import { handleAddBalance } from "../engine/balance";
+import { handleCreateOrder } from "../engine/createOrder";
+import { handleDeleteOrder } from "../engine/deleteOrder";
+import { positionAccounting } from "../engine/position";
+import { riskEngine } from "../engine/risk";
+import { applyFundingRate } from "../engine/fundingRate";
+import { checkLiquidation } from "../engine/liquidation";
+import { handleCurrentPrice } from "../engine/price";
 import {
   BALANCES,
   ENGINE_META_DATA,
@@ -30,8 +30,8 @@ import {
   ORDER,
   ORDERBOOK,
   POSITION,
-} from "../src/store/store";
-import { takeSnapshot } from "../src/engine/snapshot";
+} from "../store/store";
+import { takeSnapshot } from "../engine/snapshot";
 import fs from "fs";
 import path from "path";
 

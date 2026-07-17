@@ -9,7 +9,7 @@ await client.connect();
 
 const sendToEngineStream = async (data: EngineEvent) => {
   await client.xAdd(
-    "engine_events",
+    "engine:events",
     "*",
     {
       event: JSON.stringify(data)
