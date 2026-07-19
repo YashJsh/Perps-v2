@@ -1,6 +1,7 @@
 import redis from "redis";
 import { EngineEvents, type OrderAcceptedEvent, type DeleteOrderEvent, type TradeExecutedEvent } from "types";
 import type { OrderBookTracker } from "./orderbook";
+import { broadcastDepth, broadcastTrade } from "./wsServer";
 
 export const startRedisSubscriber = async (tracker: OrderBookTracker) => {
   const client = redis.createClient({
@@ -46,14 +47,15 @@ export const startRedisSubscriber = async (tracker: OrderBookTracker) => {
               event.side,
               event.market
             );
+            broadcastDepth(event.market);
           } 
           else if (type === EngineEvents.DeleteOrderEvent) {
             const event = parsed as DeleteOrderEvent;
             console.log(`[RedisSubscriber] DeleteOrderEvent: ${event.orderId}`);
             
-            // DeleteOrderEvent doesn't contain market, fetch it from local index
             const market = tracker.getMarketOfOrder(event.orderId) || "BTC-USD";
             tracker.cancelOrder(event.orderId, market);
+            broadcastDepth(market);
           } 
           else if (type === EngineEvents.TradeExecuted) {
             const event = parsed as TradeExecutedEvent;
@@ -64,6 +66,8 @@ export const startRedisSubscriber = async (tracker: OrderBookTracker) => {
               event.price,
               event.market
             );
+            broadcastDepth(event.market);
+            broadcastTrade(event.market, event);
           }
         } catch (err) {
           console.error("[RedisSubscriber] Error parsing individual stream event:", err);
@@ -73,7 +77,6 @@ export const startRedisSubscriber = async (tracker: OrderBookTracker) => {
       }
     } catch (err) {
       console.error("[RedisSubscriber] Event stream subscription read error:", err);
-      // Backoff on connection error
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
