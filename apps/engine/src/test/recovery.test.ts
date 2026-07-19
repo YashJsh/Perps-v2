@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
 import BTree from "sorted-btree";
 import { EngineRequestOptions, type EngineRequest } from "types";
-import { rehydrateState, BALANCES, POSITION, ORDER, ORDERBOOK, MARKPRICE, LASTTRADEDPRICE } from "../store/store";
+import { BALANCES, POSITION, ORDER, ORDERBOOK, MARKPRICE, LASTTRADEDPRICE } from "../store/store";
+import { rehydrateState } from "../recovery/rehydrate";
 import { engineHandlePlease } from "../engine/engine";
 import { loadLatestSnapShot } from "../recovery/loadSnapshot";
 import fs from "fs";
