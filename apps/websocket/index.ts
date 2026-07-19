@@ -6,6 +6,7 @@ const startAll = async () => {
   startPriceClient().catch((err) => {
     console.error("[App] Failed to start price client:", err);
   });
+
 };
 
 startAll();
