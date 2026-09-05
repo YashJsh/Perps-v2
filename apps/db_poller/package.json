@@ -1,5 +1,5 @@
 {
-  "name": "db_polar",
+  "name": "db_poller",
   "module": "index.ts",
   "type": "module",
   "private": true,

@@ -1,159 +1,146 @@
-# Turborepo starter
+# PerpsX
 
-This Turborepo starter is maintained by the Turborepo core team.
+A perpetual futures exchange built from scratch. Real-time order matching, leveraged positions, margin management, funding rates, and live BTC/USD market data from Binance — all running across six coordinated services.
 
-## Using this example
+## Architecture
 
-Run the following command:
-
-```sh
-npx create-turbo@latest
+```
+                         ┌─────────────────────────┐
+                         │       CLIENT LAYER      │
+                         │                         │
+                         │   Next.js + Zustand     │
+                         └───────────┬─────────────┘
+                                     │
+                       REST          │ WebSocket
+                                     │
+                    ┌────────────────┴───────────────┐
+                    │      GATEWAY / STREAMING       │
+                    │                                │
+                    │   Express API     WS Server◄───┼── Binance WS
+                    └───────┬───────────────▲────────┘
+                            │               │
+     ┌────────────────┐     │        (engine:events)
+     │ FUNDING ENGINE │     ▼               │
+     │  (30s Cron)    │ ┌───────────────────┴─────────┐
+     └───────┬────────┘ │         REDIS STREAMS       │
+             │          │                             │
+             └─────────►│ requests  ──► Engine        │
+                        │ responses ◄── Engine        │
+                        │ events    ──► Consumers     │
+                        └───────┬─────────────┬───────┘
+                                │             │
+                                ▼             │ (engine:events)
+              ┌───────────────────────────┐   ▼
+              │      MATCHING ENGINE      │ ┌───────────────┐
+              │                           │ │   DB POLLER   │
+              │ • Single-threaded Bun     │ └───────┬───────┘
+              │ • B-Tree Orderbooks       │         │
+              │ • Fixed-point arithmetic  │         ▼
+              │ • Margin / Leverage checks│ ┌───────────────┐
+              └─────────────┬─────────────┘ │  POSTGRESQL   │
+                            │               │   (Prisma)    │
+                            ▼               └───────────────┘
+                     ┌───────────────┐
+                     │ SNAPSHOTS DIR │
+                     │ (Disk Backup) │
+                     └───────────────┘
 ```
 
-## What's inside?
+## Services
 
-This Turborepo includes the following packages/apps:
+| Service | Path | Port | What it does |
+|---------|------|------|-------------|
+| **Engine** | `apps/engine` | — | Single-threaded in-memory matching engine. BTree orderbooks, price-time priority, event-sourced with snapshot recovery |
+| **Backend** | `apps/backend` | 3000 | Express REST API. Auth (JWT), order placement, balance deposits. Talks to engine via RPC-over-Redis-Streams |
+| **WebSocket** | `apps/websocket` | 8080 | Real-time market data fan-out. Maintains its own orderbook mirror from engine events. Ingests Binance BTC index price |
+| **Frontend** | `apps/frontend` | 3001 | Next.js trading UI. TradingView charts, live orderbook, order form, recent trades. Zustand state management |
+| **db_poller** | `apps/db_poller` | — | Event consumer. Reads engine events via Redis consumer group, persists to PostgreSQL |
+| **Funding Engine** | `apps/funding_engine` | — | Periodic funding rate application (mark vs index price divergence) |
 
-### Apps and Packages
+## Shared Packages
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+| Package | What it does |
+|---------|-------------|
+| `packages/types` | Shared TypeScript types, enums, event definitions, engine command interfaces |
+| `packages/types/src/units.ts` | Fixed-point arithmetic. All money uses integers — no floats. BigInt helpers for safe cross-products |
+| `packages/db` | Prisma client + PostgreSQL schema |
+| `packages/typescript-config` | Shared `tsconfig` |
+| `packages/eslint-config` | Shared ESLint rules |
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+## Key Design Decisions
 
-### Utilities
+**Fixed-point arithmetic** — Prices scale by 10⁴, quantities by 10⁸, money by 10⁴. Cross-products go through BigInt so nothing exceeds 2⁵³. Margin is ceiled, PnL is floored (conservative for the exchange). API boundary speaks decimal strings; integers flow everywhere else.
 
-This Turborepo has some additional tools already setup for you:
+**Event sourcing** — Every engine state mutation emits an event to `engine:events`. Multiple consumers (WebSocket server, db_poller) read independently. Engine recovers from snapshots + event replay on boot.
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+**RPC over Redis Streams** — Backend publishes to `engine:requests` with a `correlationId`, then awaits the matching response on `engine:responses`. Decouples the HTTP server from the engine process entirely.
 
-### Build
+**Single-threaded engine** — Commands process sequentially from one Redis stream. Deterministic ordering is non-negotiable for financial correctness.
 
-To build all apps and packages, run the following command:
+## Tech Stack
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+- **Runtime:** Bun
+- **Monorepo:** Turborepo
+- **Language:** TypeScript
+- **Frontend:** Next.js, Zustand, TradingView Lightweight Charts
+- **Backend:** Express, Zod, JWT
+- **Database:** PostgreSQL (Prisma ORM)
+- **Streams/Cache:** Redis Streams
+- **Data structures:** sorted-btree for orderbooks
 
-```sh
-cd my-turborepo
-turbo build
+## Getting Started
+
+### Prerequisites
+
+- [Bun](https://bun.sh) ≥ 1.3
+- [Redis](https://redis.io) running on localhost:6379
+- [Docker](https://docker.com) (for PostgreSQL)
+
+### Setup
+
+```bash
+# Install dependencies
+bun install
+
+# Start PostgreSQL
+docker run -d --name perps-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=exchange \
+  -p 5432:5432 postgres:16
+
+# Run Prisma migrations
+cd packages/db && bunx prisma migrate deploy
 ```
 
-Without global `turbo`, use your package manager:
+### Run
 
-```sh
-cd my-turborepo
-npx turbo build
-bun dlx turbo build
-bun exec turbo build
+Six terminals:
+
+```bash
+# 1. Engine
+cd apps/engine && bun run src/index.ts
+
+# 2. WebSocket server
+cd apps/websocket && bun run index.ts
+
+# 3. Backend API
+cd apps/backend && bun run dev
+
+# 4. db_poller (optional — persistence)
+cd apps/db_poller && bun run index.ts
+
+# 5. Simulator (populates orderbook + generates trades)
+cd apps/backend && bun run scripts/simulate.ts
+
+# 6. Frontend
+cd apps/frontend && bunx next dev -p 3001
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Open [http://localhost:3001](http://localhost:3001) — sign in with `demo@perpsx.io` / `demo1234`.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### Engine Tests
 
-```sh
-turbo build --filter=docs
+```bash
+cd apps/engine && bun test
 ```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-bun exec turbo build --filter=docs
-bun exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-bun exec turbo dev
-bun exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-bun exec turbo dev --filter=web
-bun exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-bun exec turbo login
-bun exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-bun exec turbo link
-bun exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
