@@ -1,5 +1,5 @@
 import BTree from "sorted-btree";
-import { ORDERBOOK } from "../store/store";
+import { ORDERBOOK } from "../state/engine-state";
 import type { RestingOrder } from "types";
 
 const SUPPORTED_SYMBOLS= [

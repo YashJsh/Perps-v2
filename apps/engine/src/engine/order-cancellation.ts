@@ -1,5 +1,5 @@
 import { EngineEvents, OrderStatus, Side, type CancelOrderResponse, type DeleteOrderPayload, type EngineEvent, type EngineRequest, type HandleResult, type OrderCancelledEvent, type DeleteOrderEvent } from "types";
-import { ORDER, ORDERBOOK } from "../store/store";
+import { ORDER, ORDERBOOK } from "../state/engine-state";
 
 const handleDeleteOrder = (request: EngineRequest, streamId: string): HandleResult<CancelOrderResponse> => {
   const payload = request.payload as DeleteOrderPayload;

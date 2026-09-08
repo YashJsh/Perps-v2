@@ -1,6 +1,6 @@
 import BTree from "sorted-btree";
 import type { RestingOrder } from "types";
-import { BALANCES, ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../store/store";
+import { BALANCES, ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../state/engine-state";
 
 export const rehydrateState = (snapshot: any) => {
   ORDER.clear();

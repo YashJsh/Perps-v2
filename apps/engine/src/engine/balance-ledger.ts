@@ -1,6 +1,6 @@
 import type { AddBalancePayload, BalanceAddedEvent, HandleResult, AddBalanceResponse } from "types";
 import { EngineEvents } from "types";
-import { BALANCES } from "../store/store";
+import { BALANCES } from "../state/engine-state";
 
 const handleAddBalance = (payload: unknown, streamId: string): HandleResult<AddBalanceResponse> => {
   const data = payload as AddBalancePayload;

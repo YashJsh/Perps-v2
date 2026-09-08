@@ -1,6 +1,6 @@
 import { Side, Type } from "types";
-import { POSITION } from "../store/store";
-import { handleCreateOrder } from "./createOrder";
+import { POSITION } from "../state/engine-state";
+import { handleCreateOrder } from "./order-matching";
 
 const checkLiquidation = (markPrice: number, streamId: string) => {
   let pos = POSITION.values();

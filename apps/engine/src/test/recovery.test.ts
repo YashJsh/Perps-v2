@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
 import BTree from "sorted-btree";
 import { EngineRequestOptions, type EngineRequest } from "types";
-import { BALANCES, POSITION, ORDER, ORDERBOOK, MARKPRICE, LASTTRADEDPRICE } from "../store/store";
+import { BALANCES, POSITION, ORDER, ORDERBOOK, MARKPRICE, LASTTRADEDPRICE } from "../state/engine-state";
 import { rehydrateState } from "../recovery/rehydrate";
-import { engineHandlePlease } from "../engine/engine";
+import { engineHandlePlease } from "../engine/perps-engine";
 import { loadLatestSnapShot } from "../recovery/loadSnapshot";
 import fs from "fs";
 import path from "path";
 
 // Mock the Redis event publisher stream to verify silent vs live execution
 const mockSendToEngineStream = mock(() => Promise.resolve());
-mock.module("../redis/engine_events", () => ({
+mock.module("../redis/event-stream", () => ({
   sendToEngineStream: mockSendToEngineStream,
 }));
 

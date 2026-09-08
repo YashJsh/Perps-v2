@@ -1,5 +1,5 @@
 import { Side, type Position } from "types";
-import { BALANCES, FILLS, ORDER, POSITION } from "../store/store";
+import { BALANCES, FILLS, ORDER, POSITION } from "../state/engine-state";
 
 const buyLiquidationPrice = (entryPrice: number, leverage: number) => {
   return entryPrice - entryPrice / leverage;
@@ -153,5 +153,3 @@ export const positionAccounting = (orderId: string) => {
     }
   }
 }
-
-

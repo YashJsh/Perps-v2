@@ -1,5 +1,5 @@
 import type { EngineRequest } from "types";
-import { MARKPRICE } from "../store/store";
+import { MARKPRICE } from "../state/engine-state";
 
 const handleCurrentPrice = (request: EngineRequest) => {
   const payload = request.payload as {

@@ -1,9 +1,9 @@
 
 import type { EngineRequest, EngineResponse } from "types";
-import { engineHandlePlease } from "./engine/engine";
-import { senderClient } from "./redis/engine_response";
-import { command_receiver_client } from "./redis/command_reciever";
-import { seedOrderBook } from "./engine/seed";
+import { engineHandlePlease } from "./engine/perps-engine";
+import { senderClient } from "./redis/response-stream";
+import { command_receiver_client } from "./redis/request-stream";
+import { seedOrderBook } from "./engine/market-initialization";
 import { loadLatestSnapShot } from "./recovery/loadSnapshot";
 import { rehydrateState } from "./recovery/rehydrate"
 
@@ -103,4 +103,3 @@ const main = async () => {
 };
 
 main();
-

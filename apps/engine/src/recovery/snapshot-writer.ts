@@ -1,5 +1,5 @@
 import { EngineEvents, type Balance, type Order, type Orderbook, type Position, type SnapshotCreatedEvent } from "types"
-import { BALANCES, ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../store/store";
+import { BALANCES, ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../state/engine-state";
 import fs from "fs";
 import path from "path";
 
