@@ -5,19 +5,20 @@ import { handleCurrentPrice } from "./market-prices";
 import { handleDeleteOrder } from "./order-cancellation";
 import { sendToEngineStream } from "../redis/event-stream";
 import { applyFundingRate } from "./funding";
-import { ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 import { takeSnapshot } from "../recovery/snapshot-writer";
 
 const engineHandlePlease = (
   request: EngineRequest,
   streamId: string,
-  context?: { isReplay?: boolean }
+  context: { isReplay?: boolean } | undefined,
+  state: EngineState
 ) => {
   const isReplay = context?.isReplay ?? false;
 
   console.log("Request arrived");
   if (request.type == EngineRequestOptions.AddBalance) {
-    const res = handleAddBalance(request.payload, streamId);
+    const res = handleAddBalance(request.payload, streamId, state);
     const response_object: EngineResponse = {
       correlationId: request.correlationId,
       ok: true,
@@ -31,12 +32,12 @@ const engineHandlePlease = (
     }
 
 
-    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
+    state.lastCommandProcessedId = streamId;
     return response_object
   };
 
   if (request.type == EngineRequestOptions.CreateOrder) {
-    const response = handleCreateOrder(request.payload, streamId);
+    const response = handleCreateOrder(request.payload, streamId, state);
     const response_object: EngineResponse = {
       correlationId: request.correlationId,
       ok: true,
@@ -48,16 +49,16 @@ const engineHandlePlease = (
       }
     }
 
-    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
+    state.lastCommandProcessedId = streamId;
     return response_object
   }
 
   if (request.type == EngineRequestOptions.CurrentPrice) {
-    handleCurrentPrice(request);
+    handleCurrentPrice(request, state);
   }
 
   if (request.type == EngineRequestOptions.CancelOrder) {
-    const response = handleDeleteOrder(request, streamId);
+    const response = handleDeleteOrder(request, streamId, state);
     const response_object: EngineResponse = {
       correlationId: request.correlationId,
       ok: true,
@@ -69,22 +70,22 @@ const engineHandlePlease = (
     }
     }
    
-    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
+    state.lastCommandProcessedId = streamId;
     return response_object;
   }
 
   if (request.type == EngineRequestOptions.ProceedFunding) {
     const data = request.payload as ProceedFundingPayload
-    applyFundingRate(LASTTRADEDPRICE, MARKPRICE, streamId, data);
-    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
+    applyFundingRate(state, streamId, data);
+    state.lastCommandProcessedId = streamId;
   }
 
   if (request.type == EngineRequestOptions.Snapshot) {
-    const response = takeSnapshot(streamId);
+    const response = takeSnapshot(streamId, state);
     if (!isReplay){
       sendToEngineStream(response.event);
     }
-    ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID = streamId;
+    state.lastCommandProcessedId = streamId;
   }
 }
 

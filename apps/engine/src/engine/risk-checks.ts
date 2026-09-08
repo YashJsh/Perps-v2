@@ -1,9 +1,9 @@
 import { Side, type CreateOrderPayload } from "types";
-import { POSITION } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 
-export const riskEngine = (payload: CreateOrderPayload): Boolean => {
+export const riskEngine = (payload: CreateOrderPayload, state: EngineState): Boolean => {
     const position_key = payload.userId + payload.symbol;
-    const position = POSITION.get(position_key);
+    const position = state.positions.get(position_key);
     if (!position) {
         return true;
     };

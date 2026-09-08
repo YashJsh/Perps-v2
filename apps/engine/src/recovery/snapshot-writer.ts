@@ -1,5 +1,5 @@
 import { EngineEvents, type Balance, type Order, type Orderbook, type Position, type SnapshotCreatedEvent } from "types"
-import { BALANCES, ENGINE_META_DATA, LASTTRADEDPRICE, MARKPRICE, ORDER, ORDERBOOK, POSITION } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 import fs from "fs";
 import path from "path";
 
@@ -26,19 +26,19 @@ if (!fs.existsSync(snapshotDir)) {
   });
 }
 
-const takeSnapshot = (streamId: string) => {
+const takeSnapshot = (streamId: string, state: EngineState) => {
   const snapshotId: string = crypto.randomUUID();
 
   const snapshot: SnapShot = {
     streamId,
     snapShotId: snapshotId,
-    last_procccessed_command_id: ENGINE_META_DATA.LAST_COMMAND_PROCESSED_ID,
-    orders: Object.fromEntries(ORDER),
-    orderbooks: Object.fromEntries(ORDERBOOK),
-    positions: Object.fromEntries(POSITION),
-    balances: Object.fromEntries(BALANCES),
-    MarkPrices: Object.fromEntries(MARKPRICE),
-    IndexPrice: Object.fromEntries(LASTTRADEDPRICE)
+    last_procccessed_command_id: state.lastCommandProcessedId,
+    orders: Object.fromEntries(state.orders),
+    orderbooks: Object.fromEntries(state.orderbooks),
+    positions: Object.fromEntries(state.positions),
+    balances: Object.fromEntries(state.balances),
+    MarkPrices: Object.fromEntries(state.markPrices),
+    IndexPrice: Object.fromEntries(state.lastTradedPrices)
   }
   const snapshot_path = path.join(
     process.cwd(),

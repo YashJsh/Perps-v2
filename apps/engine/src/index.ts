@@ -6,6 +6,7 @@ import { command_receiver_client } from "./redis/request-stream";
 import { seedOrderBook } from "./engine/market-initialization";
 import { loadLatestSnapShot } from "./recovery/loadSnapshot";
 import { rehydrateState } from "./recovery/rehydrate"
+import { EngineState } from "./state/engine-state";
 
 const sendResponse = async (data: unknown) => {
     senderClient.xAdd("engine:responses", "*", {
@@ -14,13 +15,14 @@ const sendResponse = async (data: unknown) => {
 }
 
 const main = async () => {
-    seedOrderBook();
+    const state = new EngineState();
+    seedOrderBook(state);
     let snapShotId = "0-0";
 
     try {
         const snapshot = loadLatestSnapShot();
         if (snapshot) {
-            rehydrateState(snapshot);
+            rehydrateState(snapshot, state);
             snapShotId = snapshot.last_processed_command_id;
             console.log(`Rehydrated state from snapshot at ID: ${snapShotId}`);
         }
@@ -51,7 +53,7 @@ const main = async () => {
             for (const msg of replayMessages) {
                 //@ts-ignore
                 const parsedData = JSON.parse(msg.message.data) as EngineRequest;
-                engineHandlePlease(parsedData, msg.id, { isReplay: true });
+                engineHandlePlease(parsedData, msg.id, { isReplay: true }, state);
                 console.log(`Silently replayed message: ${msg.id}`);
             }
         } catch (error) {
@@ -84,7 +86,7 @@ const main = async () => {
         //@ts-ignore
         const streamId = message[0].messages[0].id;
         try {
-            const response = engineHandlePlease(parsedData, streamId);
+            const response = engineHandlePlease(parsedData, streamId, undefined, state);
             if (!response) {
                 continue;
             }

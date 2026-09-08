@@ -13,30 +13,70 @@ import {
   type RestingOrder,
   type EngineRequest,
 } from "types";
-import { handleAddBalance } from "../engine/balance-ledger";
-import { handleCreateOrder } from "../engine/order-matching";
-import { handleDeleteOrder } from "../engine/order-cancellation";
-import { positionAccounting } from "../engine/position-accounting";
-import { riskEngine } from "../engine/risk-checks";
-import { applyFundingRate } from "../engine/funding";
-import { checkLiquidation } from "../engine/liquidation";
-import { handleCurrentPrice } from "../engine/market-prices";
-import {
-  BALANCES,
-  ENGINE_META_DATA,
-  FILLS,
-  LASTTRADEDPRICE,
-  MARKPRICE,
-  ORDER,
-  ORDERBOOK,
-  POSITION,
-} from "../state/engine-state";
-import { takeSnapshot } from "../recovery/snapshot-writer";
+import { handleAddBalance as handleAddBalanceWithState } from "../engine/balance-ledger";
+import { handleCreateOrder as handleCreateOrderWithState } from "../engine/order-matching";
+import { handleDeleteOrder as handleDeleteOrderWithState } from "../engine/order-cancellation";
+import { positionAccounting as positionAccountingWithState } from "../engine/position-accounting";
+import { riskEngine as riskEngineWithState } from "../engine/risk-checks";
+import { applyFundingRate as applyFundingRateWithState } from "../engine/funding";
+import { checkLiquidation as checkLiquidationWithState } from "../engine/liquidation";
+import { handleCurrentPrice as handleCurrentPriceWithState } from "../engine/market-prices";
+import { EngineState } from "../state/engine-state";
+import { takeSnapshot as takeSnapshotWithState } from "../recovery/snapshot-writer";
 import fs from "fs";
 import path from "path";
 
 const SYMBOL = "BTC-USD";
 const STREAM_ID = "test-stream";
+const testState = new EngineState();
+const BALANCES = testState.balances;
+const FILLS = testState.fills;
+const LASTTRADEDPRICE = testState.lastTradedPrices;
+const MARKPRICE = testState.markPrices;
+const ORDER = testState.orders;
+const ORDERBOOK = testState.orderbooks;
+const POSITION = testState.positions;
+
+const handleAddBalance = (payload: unknown, streamId: string) =>
+  handleAddBalanceWithState(payload, streamId, testState);
+const handleCreateOrder = (payload: unknown, streamId: string) =>
+  handleCreateOrderWithState(payload, streamId, testState);
+const handleDeleteOrder = (request: EngineRequest, streamId: string) =>
+  handleDeleteOrderWithState(request, streamId, testState);
+const positionAccounting = (orderId: string) =>
+  positionAccountingWithState(orderId, testState);
+const riskEngine = (payload: Parameters<typeof riskEngineWithState>[0]) =>
+  riskEngineWithState(payload, testState);
+const applyFundingRate = (
+  indexPriceData: Map<string, number>,
+  markPriceData: Map<string, number>,
+  streamId: string,
+  data: Parameters<typeof applyFundingRateWithState>[2]
+) => {
+  testState.lastTradedPrices.clear();
+  for (const [symbol, price] of indexPriceData) {
+    testState.lastTradedPrices.set(symbol, price);
+  }
+  testState.markPrices.clear();
+  for (const [symbol, price] of markPriceData) {
+    testState.markPrices.set(symbol, price);
+  }
+  return applyFundingRateWithState(testState, streamId, data);
+};
+const checkLiquidation = (markPrice: number, streamId: string) =>
+  checkLiquidationWithState(markPrice, streamId, testState);
+const handleCurrentPrice = (request: EngineRequest) =>
+  handleCurrentPriceWithState(request, testState);
+const takeSnapshot = (streamId: string) =>
+  takeSnapshotWithState(streamId, testState);
+const ENGINE_META_DATA = {
+  get LAST_COMMAND_PROCESSED_ID() {
+    return testState.lastCommandProcessedId;
+  },
+  set LAST_COMMAND_PROCESSED_ID(value: string) {
+    testState.lastCommandProcessedId = value;
+  },
+};
 
 const createOrderbook = (): Orderbook => ({
   asks: new BTree<number, RestingOrder[]>(),

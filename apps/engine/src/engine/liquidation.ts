@@ -1,9 +1,9 @@
 import { Side, Type } from "types";
-import { POSITION } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 import { handleCreateOrder } from "./order-matching";
 
-const checkLiquidation = (markPrice: number, streamId: string) => {
-  let pos = POSITION.values();
+const checkLiquidation = (markPrice: number, streamId: string, state: EngineState) => {
+  let pos = state.positions.values();
   //Update unrealized PNL
   pos.forEach((p) => {
     if (Math.abs(p.size) <= 0) {
@@ -30,7 +30,7 @@ const checkLiquidation = (markPrice: number, streamId: string) => {
           side: closeSide,
           type: Type.Market,
           leverage: p.leverage
-        }, streamId);
+        }, streamId, state);
       } catch (err) {
         if (err instanceof Error && err.message === "No fills found for order") {
           // Ignore - expected when there is no matching liquidity to fill the liquidation order immediately

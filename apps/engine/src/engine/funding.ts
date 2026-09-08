@@ -1,20 +1,20 @@
 import { EngineEvents, Side, type FundingPaymentEvent, type ProceedFundingPayload } from "types";
-import { BALANCES, POSITION } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 
-const applyFundingRate = (indexPriceData: Map<string, number>, markPriceData: Map<string, number>, streamId: string, data: ProceedFundingPayload) => {
-  const indexPrice = indexPriceData.get(data.symbol);
+const applyFundingRate = (state: EngineState, streamId: string, data: ProceedFundingPayload) => {
+  const indexPrice = state.lastTradedPrices.get(data.symbol);
   if (!indexPrice) {
     throw new Error("Index Price Not found");
   }
-  const markPrice = markPriceData.get(data.symbol);
+  const markPrice = state.markPrices.get(data.symbol);
   if (!markPrice) {
     throw new Error("Mark Price Not found");
   }
   const fundingRate = (markPrice - indexPrice) / indexPrice
-  for (const position of POSITION) {
+  for (const position of state.positions) {
     let notional_value = Math.abs(position[1].size) * position[1].averageEntryPrice;
     let funding = notional_value * fundingRate;
-    let balance = BALANCES.get(position[1].userId);
+    let balance = state.balances.get(position[1].userId);
     if (!balance) {
       continue;
     }

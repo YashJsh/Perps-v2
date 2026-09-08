@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
 import BTree from "sorted-btree";
 import { EngineRequestOptions, type EngineRequest } from "types";
-import { BALANCES, POSITION, ORDER, ORDERBOOK, MARKPRICE, LASTTRADEDPRICE } from "../state/engine-state";
+import { EngineState } from "../state/engine-state";
 import { rehydrateState } from "../recovery/rehydrate";
 import { engineHandlePlease } from "../engine/perps-engine";
 import { loadLatestSnapShot } from "../recovery/loadSnapshot";
@@ -14,6 +14,14 @@ mock.module("../redis/event-stream", () => ({
   sendToEngineStream: mockSendToEngineStream,
 }));
 
+const state = new EngineState();
+const BALANCES = state.balances;
+const POSITION = state.positions;
+const ORDER = state.orders;
+const ORDERBOOK = state.orderbooks;
+const MARKPRICE = state.markPrices;
+const LASTTRADEDPRICE = state.lastTradedPrices;
+
 describe("State Rehydration", () => {
   beforeEach(() => {
     BALANCES.clear();
@@ -22,6 +30,7 @@ describe("State Rehydration", () => {
     ORDERBOOK.clear();
     MARKPRICE.clear();
     LASTTRADEDPRICE.clear();
+    state.lastCommandProcessedId = "0-0";
   });
 
   test("rehydrateState correctly reconstructs store from snapshot payload", () => {
@@ -46,7 +55,7 @@ describe("State Rehydration", () => {
       IndexPrice: { "BTC-USD": 49600 }
     };
 
-    rehydrateState(mockSnapshot);
+    rehydrateState(mockSnapshot, state);
 
     // Verify Balances
     expect(BALANCES.get("alice")).toEqual({ available: 1000, locked: 200 });
@@ -84,7 +93,7 @@ describe("Silent Catch-Up Replay Logic", () => {
       payload: { userId: "alice", symbol: "BTC-USD", amount: 500 }
     };
 
-    engineHandlePlease(request, "200-1", { isReplay: true });
+    engineHandlePlease(request, "200-1", { isReplay: true }, state);
 
     // Replay executes state mutations silently
     expect(BALANCES.get("alice")?.available).toBe(1500);
@@ -100,7 +109,7 @@ describe("Silent Catch-Up Replay Logic", () => {
       payload: { userId: "alice", symbol: "BTC-USD", amount: 500 }
     };
 
-    engineHandlePlease(request, "200-2");
+    engineHandlePlease(request, "200-2", undefined, state);
 
     // Live execution mutates state and broadcasts notifications
     expect(BALANCES.get("alice")?.available).toBe(1500);

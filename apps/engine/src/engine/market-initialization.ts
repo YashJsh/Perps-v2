@@ -1,5 +1,5 @@
 import BTree from "sorted-btree";
-import { ORDERBOOK } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 import type { RestingOrder } from "types";
 
 const SUPPORTED_SYMBOLS= [
@@ -7,9 +7,9 @@ const SUPPORTED_SYMBOLS= [
    "SOL_USD" 
 ]
 
-export const seedOrderBook = ()=>{
+export const seedOrderBook = (state: EngineState)=>{
     for (const symbol of SUPPORTED_SYMBOLS){
-        ORDERBOOK.set(symbol, {
+        state.orderbooks.set(symbol, {
             asks : new BTree<number, RestingOrder[]>(),
             bids : new BTree<number, RestingOrder[]>()
         })

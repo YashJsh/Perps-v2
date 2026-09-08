@@ -1,19 +1,19 @@
 import { EngineEvents, OrderStatus, Side, type CancelOrderResponse, type DeleteOrderPayload, type EngineEvent, type EngineRequest, type HandleResult, type OrderCancelledEvent, type DeleteOrderEvent } from "types";
-import { ORDER, ORDERBOOK } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 
-const handleDeleteOrder = (request: EngineRequest, streamId: string): HandleResult<CancelOrderResponse> => {
+const handleDeleteOrder = (request: EngineRequest, streamId: string, state: EngineState): HandleResult<CancelOrderResponse> => {
   const payload = request.payload as DeleteOrderPayload;
   const orderId = payload.orderId;
   const userId = payload.userId;
   const symbol = payload.symbol;
 
-  const orderbook = ORDERBOOK.get(symbol);
+  const orderbook = state.orderbooks.get(symbol);
   if (!orderbook) {
     console.log("Orderbook not found");
     throw new Error("Orderbook not found");
   }
 
-  const order = ORDER.get(orderId);
+  const order = state.orders.get(orderId);
   if (!order) {
     console.log("Order not found");
     throw new Error("Order not found");

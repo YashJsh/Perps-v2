@@ -1,5 +1,5 @@
 import { Side, type Position } from "types";
-import { BALANCES, FILLS, ORDER, POSITION } from "../state/engine-state";
+import type { EngineState } from "../state/engine-state";
 
 const buyLiquidationPrice = (entryPrice: number, leverage: number) => {
   return entryPrice - entryPrice / leverage;
@@ -17,16 +17,16 @@ const updateRealizedPnlShort = (entryPrice: number, size: number, exitPrice: num
   return (entryPrice - exitPrice) * size;
 };
 
-export const positionAccounting = (orderId: string) => {
-  const order = ORDER.get(orderId);
+export const positionAccounting = (orderId: string, state: EngineState) => {
+  const order = state.orders.get(orderId);
   if (!order) {
     throw Error("Order not found");
   }
-  const fills = FILLS.get(orderId);
+  const fills = state.fills.get(orderId);
   if (!fills) {
     throw new Error("No fills found for order");
   }
-  const balances = BALANCES.get(order.userId);
+  const balances = state.balances.get(order.userId);
   if (!balances) {
     throw new Error("Balance not found");
   }
@@ -51,7 +51,7 @@ export const positionAccounting = (orderId: string) => {
   };
 
 
-  const position = POSITION.get(order.userId + order.symbol);
+  const position = state.positions.get(order.userId + order.symbol);
   if (!position) {
     //Create a fresh one:
     const entryPrice = new_notional_value / Math.abs(incoming_signed_exposure);
@@ -70,7 +70,7 @@ export const positionAccounting = (orderId: string) => {
       market: order.symbol,
       side: order.side
     };
-    POSITION.set(order.userId + order.symbol, pos);
+    state.positions.set(order.userId + order.symbol, pos);
     console.log("Position placed successfully");
     return;
   }
@@ -107,7 +107,7 @@ export const positionAccounting = (orderId: string) => {
       position.realizedPnl = (position.realizedPnl ?? 0) + calculatePnl;
       balances.available += calculatePnl + position.margin;
       balances.locked -= position.margin;
-      POSITION.delete(order.userId + order.symbol);
+      state.positions.delete(order.userId + order.symbol);
       return;
     }
     else if (Math.sign(new_qty) === Math.sign(position.size)) {
