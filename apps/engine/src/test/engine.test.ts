@@ -27,14 +27,14 @@ import path from "path";
 
 const SYMBOL = "BTC-USD";
 const STREAM_ID = "test-stream";
-const testState = new EngineState();
-const BALANCES = testState.balances;
-const FILLS = testState.fills;
-const LASTTRADEDPRICE = testState.lastTradedPrices;
-const MARKPRICE = testState.markPrices;
-const ORDER = testState.orders;
-const ORDERBOOK = testState.orderbooks;
-const POSITION = testState.positions;
+let testState: EngineState;
+let BALANCES: EngineState["balances"];
+let FILLS: EngineState["fills"];
+let LASTTRADEDPRICE: EngineState["lastTradedPrices"];
+let MARKPRICE: EngineState["markPrices"];
+let ORDER: EngineState["orders"];
+let ORDERBOOK: EngineState["orderbooks"];
+let POSITION: EngineState["positions"];
 
 const handleAddBalance = (payload: unknown, streamId: string) =>
   handleAddBalanceWithState(payload, streamId, testState);
@@ -80,12 +80,14 @@ const ENGINE_META_DATA = {
 const createOrderbook = (): OrderBook => new OrderBook();
 
 const resetStore = () => {
-  BALANCES.clear();
-  FILLS.clear();
-  ORDER.clear();
-  ORDERBOOK.clear();
-  POSITION.clear();
-  MARKPRICE.clear();
+  testState = new EngineState();
+  BALANCES = testState.balances;
+  FILLS = testState.fills;
+  LASTTRADEDPRICE = testState.lastTradedPrices;
+  MARKPRICE = testState.markPrices;
+  ORDER = testState.orders;
+  ORDERBOOK = testState.orderbooks;
+  POSITION = testState.positions;
   ORDERBOOK.set(SYMBOL, createOrderbook());
 };
 

@@ -10,14 +10,25 @@ import path from "path";
 // Mock the Redis event publisher stream to verify silent vs live execution
 const mockSendToEngineStream = mock(() => Promise.resolve());
 
-const state = new EngineState();
-const engine = new PerpsEngine(state, mockSendToEngineStream);
-const BALANCES = state.balances;
-const POSITION = state.positions;
-const ORDER = state.orders;
-const ORDERBOOK = state.orderbooks;
-const MARKPRICE = state.markPrices;
-const LASTTRADEDPRICE = state.lastTradedPrices;
+let state: EngineState;
+let engine: PerpsEngine;
+let BALANCES: EngineState["balances"];
+let POSITION: EngineState["positions"];
+let ORDER: EngineState["orders"];
+let ORDERBOOK: EngineState["orderbooks"];
+let MARKPRICE: EngineState["markPrices"];
+let LASTTRADEDPRICE: EngineState["lastTradedPrices"];
+
+beforeEach(() => {
+  state = new EngineState();
+  engine = new PerpsEngine(state, mockSendToEngineStream);
+  BALANCES = state.balances;
+  POSITION = state.positions;
+  ORDER = state.orders;
+  ORDERBOOK = state.orderbooks;
+  MARKPRICE = state.markPrices;
+  LASTTRADEDPRICE = state.lastTradedPrices;
+});
 
 describe("State Rehydration", () => {
   beforeEach(() => {
