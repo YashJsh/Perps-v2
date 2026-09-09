@@ -2,18 +2,16 @@ import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
 import { EngineRequestOptions, Side, type EngineRequest } from "types";
 import { EngineState } from "../state/engine-state";
 import { rehydrateState } from "../recovery/rehydrate";
-import { engineHandlePlease } from "../engine/perps-engine";
+import { PerpsEngine } from "../engine/perps-engine";
 import { loadLatestSnapShot } from "../recovery/loadSnapshot";
 import fs from "fs";
 import path from "path";
 
 // Mock the Redis event publisher stream to verify silent vs live execution
 const mockSendToEngineStream = mock(() => Promise.resolve());
-mock.module("../redis/event-stream", () => ({
-  sendToEngineStream: mockSendToEngineStream,
-}));
 
 const state = new EngineState();
+const engine = new PerpsEngine(state, mockSendToEngineStream);
 const BALANCES = state.balances;
 const POSITION = state.positions;
 const ORDER = state.orders;
@@ -92,7 +90,7 @@ describe("Silent Catch-Up Replay Logic", () => {
       payload: { userId: "alice", symbol: "BTC-USD", amount: 500 }
     };
 
-    engineHandlePlease(request, "200-1", { isReplay: true }, state);
+    engine.execute(request, "200-1", { isReplay: true });
 
     // Replay executes state mutations silently
     expect(BALANCES.get("alice")?.available).toBe(1500);
@@ -108,7 +106,7 @@ describe("Silent Catch-Up Replay Logic", () => {
       payload: { userId: "alice", symbol: "BTC-USD", amount: 500 }
     };
 
-    engineHandlePlease(request, "200-2", undefined, state);
+    engine.execute(request, "200-2");
 
     // Live execution mutates state and broadcasts notifications
     expect(BALANCES.get("alice")?.available).toBe(1500);

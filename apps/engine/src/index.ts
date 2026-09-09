@@ -1,6 +1,7 @@
 
 import type { EngineRequest, EngineResponse } from "types";
-import { engineHandlePlease } from "./engine/perps-engine";
+import { PerpsEngine } from "./engine/perps-engine";
+import { sendToEngineStream } from "./redis/event-stream";
 import { senderClient } from "./redis/response-stream";
 import { command_receiver_client } from "./redis/request-stream";
 import { seedOrderBook } from "./engine/market-initialization";
@@ -16,6 +17,7 @@ const sendResponse = async (data: unknown) => {
 
 const main = async () => {
     const state = new EngineState();
+    const engine = new PerpsEngine(state, sendToEngineStream);
     seedOrderBook(state);
     let snapShotId = "0-0";
 
@@ -53,7 +55,7 @@ const main = async () => {
             for (const msg of replayMessages) {
                 //@ts-ignore
                 const parsedData = JSON.parse(msg.message.data) as EngineRequest;
-                engineHandlePlease(parsedData, msg.id, { isReplay: true }, state);
+                engine.execute(parsedData, msg.id, { isReplay: true });
                 console.log(`Silently replayed message: ${msg.id}`);
             }
         } catch (error) {
@@ -86,7 +88,7 @@ const main = async () => {
         //@ts-ignore
         const streamId = message[0].messages[0].id;
         try {
-            const response = engineHandlePlease(parsedData, streamId, undefined, state);
+            const response = engine.execute(parsedData, streamId);
             if (!response) {
                 continue;
             }

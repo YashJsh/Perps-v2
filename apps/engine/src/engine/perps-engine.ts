@@ -1,92 +1,85 @@
-import { EngineRequestOptions, type EngineRequest, type EngineResponse, type ProceedFundingPayload } from "types";
+import { EngineRequestOptions, type EngineEvent, type EngineRequest, type EngineResponse, type ProceedFundingPayload } from "types";
 import { handleAddBalance } from "./balance-ledger";
 import { handleCreateOrder } from "./order-matching";
 import { handleCurrentPrice } from "./market-prices";
 import { handleDeleteOrder } from "./order-cancellation";
-import { sendToEngineStream } from "../redis/event-stream";
 import { applyFundingRate } from "./funding";
 import type { EngineState } from "../state/engine-state";
 import { takeSnapshot } from "../recovery/snapshot-writer";
 
-const engineHandlePlease = (
-  request: EngineRequest,
-  streamId: string,
-  context: { isReplay?: boolean } | undefined,
-  state: EngineState
-) => {
-  const isReplay = context?.isReplay ?? false;
+export type EventPublisher = (event: EngineEvent) => void | Promise<void>;
 
-  console.log("Request arrived");
-  if (request.type == EngineRequestOptions.AddBalance) {
-    const res = handleAddBalance(request.payload, streamId, state);
-    const response_object: EngineResponse = {
-      correlationId: request.correlationId,
-      ok: true,
-      data: res.response
-    };
+export class PerpsEngine {
+  constructor(
+    private readonly state: EngineState,
+    private readonly publishEvent: EventPublisher,
+  ) {}
 
-    if (!isReplay) {
-      for (const event of res.events) {
-        sendToEngineStream(event);
-      }
+  execute(
+    request: EngineRequest,
+    streamId: string,
+    context?: { isReplay?: boolean },
+  ): EngineResponse | undefined {
+    const isReplay = context?.isReplay ?? false;
+
+    console.log("Request arrived");
+    if (request.type == EngineRequestOptions.AddBalance) {
+      const result = handleAddBalance(request.payload, streamId, this.state);
+      this.publishEvents(result.events, isReplay);
+      this.state.lastCommandProcessedId = streamId;
+      return {
+        correlationId: request.correlationId,
+        ok: true,
+        data: result.response,
+      };
     }
 
-
-    state.lastCommandProcessedId = streamId;
-    return response_object
-  };
-
-  if (request.type == EngineRequestOptions.CreateOrder) {
-    const response = handleCreateOrder(request.payload, streamId, state);
-    const response_object: EngineResponse = {
-      correlationId: request.correlationId,
-      ok: true,
-      data: response.response
-    }
-    if (!isReplay) {
-      for (const event of response.events) {
-        sendToEngineStream(event);
-      }
+    if (request.type == EngineRequestOptions.CreateOrder) {
+      const result = handleCreateOrder(request.payload, streamId, this.state);
+      this.publishEvents(result.events, isReplay);
+      this.state.lastCommandProcessedId = streamId;
+      return {
+        correlationId: request.correlationId,
+        ok: true,
+        data: result.response,
+      };
     }
 
-    state.lastCommandProcessedId = streamId;
-    return response_object
+    if (request.type == EngineRequestOptions.CurrentPrice) {
+      handleCurrentPrice(request, this.state);
+    }
+
+    if (request.type == EngineRequestOptions.CancelOrder) {
+      const result = handleDeleteOrder(request, streamId, this.state);
+      this.publishEvents(result.events, isReplay);
+      this.state.lastCommandProcessedId = streamId;
+      return {
+        correlationId: request.correlationId,
+        ok: true,
+        data: result.response,
+      };
+    }
+
+    if (request.type == EngineRequestOptions.ProceedFunding) {
+      const data = request.payload as ProceedFundingPayload;
+      applyFundingRate(this.state, streamId, data);
+      this.state.lastCommandProcessedId = streamId;
+    }
+
+    if (request.type == EngineRequestOptions.Snapshot) {
+      const result = takeSnapshot(streamId, this.state);
+      this.publishEvents([result.event], isReplay);
+      this.state.lastCommandProcessedId = streamId;
+    }
   }
 
-  if (request.type == EngineRequestOptions.CurrentPrice) {
-    handleCurrentPrice(request, state);
-  }
+  private publishEvents(events: EngineEvent[], isReplay: boolean): void {
+    if (isReplay) {
+      return;
+    }
 
-  if (request.type == EngineRequestOptions.CancelOrder) {
-    const response = handleDeleteOrder(request, streamId, state);
-    const response_object: EngineResponse = {
-      correlationId: request.correlationId,
-      ok: true,
-      data: response.response
+    for (const event of events) {
+      void this.publishEvent(event);
     }
-    if (!isReplay){
-       for (const event of response.events) {
-      sendToEngineStream(event);
-    }
-    }
-   
-    state.lastCommandProcessedId = streamId;
-    return response_object;
-  }
-
-  if (request.type == EngineRequestOptions.ProceedFunding) {
-    const data = request.payload as ProceedFundingPayload
-    applyFundingRate(state, streamId, data);
-    state.lastCommandProcessedId = streamId;
-  }
-
-  if (request.type == EngineRequestOptions.Snapshot) {
-    const response = takeSnapshot(streamId, state);
-    if (!isReplay){
-      sendToEngineStream(response.event);
-    }
-    state.lastCommandProcessedId = streamId;
   }
 }
-
-export { engineHandlePlease }
