@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import BTree from "sorted-btree";
 import {
   EngineEvents,
   EngineRequestOptions,
@@ -8,7 +7,6 @@ import {
   Type,
   type Fill,
   type Order,
-  type Orderbook,
   type Position,
   type RestingOrder,
   type EngineRequest,
@@ -22,6 +20,7 @@ import { applyFundingRate as applyFundingRateWithState } from "../engine/funding
 import { checkLiquidation as checkLiquidationWithState } from "../engine/liquidation";
 import { handleCurrentPrice as handleCurrentPriceWithState } from "../engine/market-prices";
 import { EngineState } from "../state/engine-state";
+import { OrderBook } from "../engine/order-book";
 import { takeSnapshot as takeSnapshotWithState } from "../recovery/snapshot-writer";
 import fs from "fs";
 import path from "path";
@@ -78,10 +77,7 @@ const ENGINE_META_DATA = {
   },
 };
 
-const createOrderbook = (): Orderbook => ({
-  asks: new BTree<number, RestingOrder[]>(),
-  bids: new BTree<number, RestingOrder[]>(),
-});
+const createOrderbook = (): OrderBook => new OrderBook();
 
 const resetStore = () => {
   BALANCES.clear();
@@ -127,7 +123,7 @@ const seedRestingAsk = (overrides: Partial<RestingOrder> = {}) => {
     timestamp: restingOrder.timestamp,
     leverage: 5,
   });
-  ORDERBOOK.get(SYMBOL)?.asks.set(restingOrder.price, [restingOrder]);
+  ORDERBOOK.get(SYMBOL)?.add(restingOrder);
 };
 
 const seedRestingBid = (overrides: Partial<RestingOrder> = {}) => {
@@ -156,7 +152,7 @@ const seedRestingBid = (overrides: Partial<RestingOrder> = {}) => {
     timestamp: restingOrder.timestamp,
     leverage: 5,
   });
-  ORDERBOOK.get(SYMBOL)?.bids.set(restingOrder.price, [restingOrder]);
+  ORDERBOOK.get(SYMBOL)?.add(restingOrder);
 };
 
 beforeEach(() => {
@@ -232,7 +228,7 @@ describe("limit order creation and matching", () => {
 
     const buyerOrder = [...ORDER.values()].find((o) => o.userId === "buyer");
     expect(buyerOrder?.status).toBe(OrderStatus.Open);
-    expect(ORDERBOOK.get(SYMBOL)?.bids.get(100)?.length).toBe(1);
+     expect(ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100)?.length).toBe(1);
   });
 
   test("fully matched crossing buy is marked as filled", () => {
@@ -287,7 +283,7 @@ describe("limit order creation and matching", () => {
       size: 2,
       averageEntryPrice: 100,
     });
-    expect(ORDERBOOK.get(SYMBOL)?.asks.get(100)?.length ?? 0).toBe(0);
+     expect(ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Sell, 100)?.length ?? 0).toBe(0);
   });
 
   test("matches an incoming sell against the highest bid first", () => {
@@ -334,7 +330,7 @@ describe("limit order creation and matching", () => {
 
     const buyerOrder = [...ORDER.values()].find((o) => o.userId === "buyer");
     const restingBid = buyerOrder
-      ? ORDERBOOK.get(SYMBOL)?.bids.get(105)?.find((r) => r.orderId === buyerOrder.orderId)
+       ? ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 105)?.find((r) => r.orderId === buyerOrder.orderId)
       : undefined;
 
     expect(result.response.filledQty).toBe(1);
@@ -390,7 +386,7 @@ describe("limit order creation and matching", () => {
 
     const sellerOrder = [...ORDER.values()].find((o) => o.userId === "seller");
     const restingAsk = sellerOrder
-      ? ORDERBOOK.get(SYMBOL)?.asks.get(100)?.find((r) => r.orderId === sellerOrder.orderId)
+       ? ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Sell, 100)?.find((r) => r.orderId === sellerOrder.orderId)
       : undefined;
 
     expect(result.response.filledQty).toBe(1);
@@ -509,7 +505,7 @@ describe("order cancellation", () => {
 
     expect(result.response.success).toBe(true);
     expect(order.status).toBe(OrderStatus.Cancelled);
-    expect(ORDERBOOK.get(SYMBOL)?.bids.get(100)?.length ?? 0).toBe(0);
+     expect(ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100)?.length ?? 0).toBe(0);
   });
 
   test("rejects cancellation of an already filled order", () => {
@@ -1345,7 +1341,7 @@ describe("edge cases", () => {
       STREAM_ID,
     );
 
-    const bidsAt100 = ORDERBOOK.get(SYMBOL)?.bids.get(100);
+     const bidsAt100 = ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100);
     expect(bidsAt100).toHaveLength(2);
     expect(bidsAt100?.[0]?.userId).toBe("buyer1");
     expect(bidsAt100?.[1]?.userId).toBe("buyer2");
@@ -1373,7 +1369,7 @@ describe("edge cases", () => {
       STREAM_ID,
     );
 
-    const bidsAt100 = ORDERBOOK.get(SYMBOL)?.bids.get(100);
+     const bidsAt100 = ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100);
     expect(bidsAt100).toHaveLength(1);
     expect(bidsAt100?.[0]?.userId).toBe("buyer2");
   });

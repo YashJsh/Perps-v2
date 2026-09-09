@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
-import BTree from "sorted-btree";
-import { EngineRequestOptions, type EngineRequest } from "types";
+import { EngineRequestOptions, Side, type EngineRequest } from "types";
 import { EngineState } from "../state/engine-state";
 import { rehydrateState } from "../recovery/rehydrate";
 import { engineHandlePlease } from "../engine/perps-engine";
@@ -69,8 +68,8 @@ describe("State Rehydration", () => {
     // Verify Orderbook Sorted B-Trees
     const book = ORDERBOOK.get("BTC-USD");
     expect(book).toBeDefined();
-    expect(book?.asks.get(51000)).toEqual([{ orderId: "order-ask" }] as any);
-    expect(book?.bids.get(49000)).toEqual([{ orderId: "order-bid" }] as any);
+    expect(book?.ordersAt(Side.Sell, 51000)).toEqual([{ orderId: "order-ask" }] as any);
+    expect(book?.ordersAt(Side.Buy, 49000)).toEqual([{ orderId: "order-bid" }] as any);
 
     // Verify Mark/Index Prices
     expect(MARKPRICE.get("BTC-USD")).toBe(49500);

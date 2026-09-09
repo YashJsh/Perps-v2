@@ -1,7 +1,8 @@
-import type { Balance, Fill, Order, Orderbook, Position, RestingOrder } from "types";
+import type { Balance, Fill, Order, Position } from "types";
+import { OrderBook } from "../engine/order-book";
 
 export class EngineState {
-  readonly orderbooks = new Map<string, Orderbook>();
+  readonly orderbooks = new Map<string, OrderBook>();
   readonly orders = new Map<string, Order>();
   readonly fills = new Map<string, Fill[]>();
   readonly positions = new Map<string, Position>();

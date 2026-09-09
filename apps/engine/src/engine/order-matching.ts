@@ -1,5 +1,6 @@
-import type { CreateOrderPayload, Fill, Orderbook, RestingOrder, HandleResult, CreateOrderResponse, OrderAcceptedEvent, TradeExecutedEvent, EngineEvent } from "types";
+import type { CreateOrderPayload, Fill, RestingOrder, HandleResult, CreateOrderResponse, OrderAcceptedEvent, TradeExecutedEvent, EngineEvent } from "types";
 import type { EngineState } from "../state/engine-state";
+import { OrderBook } from "./order-book";
 import { OrderStatus, Side, Type, EngineEvents } from "types";
 import { riskEngine } from "./risk-checks";
 import { handleBalanceChecks } from "./balance-ledger";
@@ -67,7 +68,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string, state
   if (data.type == Type.Limit) {
     let remaining_qty = data.quantity;
 
-    for (const [price, order] of orderbook.asks.entries()) {
+    for (const [price, order] of orderbook.askLevels()) {
       if (price <= data.price) {
         for (let i = 0; i < order.length; i++) {
           let sellingOrder = order[i];
@@ -147,7 +148,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string, state
           if (sellOrder.remainingQty == 0) {
             //Remove the orderfrom the book;
             sellOrder.status = OrderStatus.Filled;
-            order.splice(i, 1);
+            orderbook.remove(sellOrder);
             i--;
           }
 
@@ -188,7 +189,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string, state
   } else {
     let remaining_qty = data.quantity;
 
-    for (const [price, order] of orderbook.asks.entries()) {
+    for (const [price, order] of orderbook.askLevels()) {
       if (remaining_qty <= 0) {
         break;
       }
@@ -269,7 +270,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string, state
         if (sellOrder.remainingQty == 0) {
           //Remove the orderfrom the book;
           sellOrder.status = OrderStatus.Filled;
-          order.splice(i, 1);
+          orderbook.remove(sellOrder);
           i--;
         }
         if (remaining_qty == 0) {
@@ -342,7 +343,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string, state: Engi
 
   if (data.type == Type.Limit) {
     let remaining_qty = data.quantity;
-    for (const [price, order] of orderbook.bids.entriesReversed()) {
+    for (const [price, order] of orderbook.bidLevelsReversed()) {
       if (price >= data.price) {
         for (let i = 0; i < order.length; i++) {
           let buyingOrder = order[i];
@@ -421,7 +422,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string, state: Engi
           if (buyOrder.remainingQty == 0) {
             //Remove the orderfrom the book;
             buyOrder.status = OrderStatus.Filled;
-            order.splice(i, 1);
+            orderbook.remove(buyOrder);
             i--;
           }
 
@@ -467,7 +468,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string, state: Engi
   else {
     let remaining_qty = data.quantity;
 
-    for (const [price, order] of orderbook.bids.entriesReversed()) {
+    for (const [price, order] of orderbook.bidLevelsReversed()) {
       if (remaining_qty <= 0) {
         break;
       }
@@ -548,7 +549,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string, state: Engi
         if (buyOrder.remainingQty == 0) {
           //Remove the orderfrom the book;
           buyOrder.status = OrderStatus.Filled;
-          order.splice(i, 1);
+          orderbook.remove(buyOrder);
           i--;
         }
 
@@ -578,7 +579,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string, state: Engi
   }
 }
 
-const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: Orderbook) => {
+const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: OrderBook) => {
   let restingOrder: RestingOrder = {
     orderId: orderId,
     userId: order.userId,
@@ -590,15 +591,11 @@ const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: numb
     timestamp: Date.now()
   }
 
-  if (!orderbook.bids.has(restingOrder.price)) {
-    orderbook.bids.set(restingOrder.price, [restingOrder]);
-    return;
-  };
-  orderbook.bids.get(restingOrder.price)?.push(restingOrder);
+  orderbook.add(restingOrder);
   return restingOrder;
 }
 
-const addAsks = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: Orderbook) => {
+const addAsks = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: OrderBook) => {
   let restingOrder: RestingOrder = {
     orderId: orderId,
     userId: order.userId,
@@ -610,9 +607,5 @@ const addAsks = (order: CreateOrderPayload, orderId: string, remaining_qty: numb
     timestamp: Date.now()
   }
 
-  if (!orderbook.asks.has(restingOrder.price)) {
-    orderbook.asks.set(restingOrder.price, [restingOrder]);
-    return;
-  };
-  orderbook.asks.get(restingOrder.price)?.push(restingOrder);
+  orderbook.add(restingOrder);
 }

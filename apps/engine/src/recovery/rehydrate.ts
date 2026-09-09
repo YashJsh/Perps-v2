@@ -1,6 +1,5 @@
-import BTree from "sorted-btree";
-import type { RestingOrder } from "types";
 import type { EngineState } from "../state/engine-state";
+import { OrderBook, type OrderBookSnapshot } from "../engine/order-book";
 
 export const rehydrateState = (snapshot: any, state: EngineState) => {
   state.orders.clear();
@@ -25,17 +24,7 @@ export const rehydrateState = (snapshot: any, state: EngineState) => {
 
   state.orderbooks.clear();
   for (const [symbol, bookData] of Object.entries(snapshot.orderbooks)) {
-    const book = {
-      asks: new BTree<number, RestingOrder[]>(),
-      bids: new BTree<number, RestingOrder[]>()
-    };
-    for (const [price, orders] of Object.entries((bookData as any).asks)) {
-      book.asks.set(parseInt(price), orders as any);
-    }
-    for (const [price, orders] of Object.entries((bookData as any).bids)) {
-      book.bids.set(parseInt(price), orders as any);
-    }
-    state.orderbooks.set(symbol, book);
+    state.orderbooks.set(symbol, OrderBook.fromSnapshot(bookData as OrderBookSnapshot));
   }
 
   state.lastTradedPrices.clear();

@@ -22,40 +22,12 @@ const handleDeleteOrder = (request: EngineRequest, streamId: string, state: Engi
     console.log("Can't delete someone else order");
     throw new Error("Ownership of order required for deleting the order");
   }
-  const order_side = order.side;
   if (order.status == OrderStatus.Filled || order.status == OrderStatus.Cancelled) {
     throw new Error("Order is already filled or cancelled");
   }
   else {
-    if (order.side == Side.Buy) {
-      let price_orders = orderbook.bids.get(order.price);
-      if (!price_orders) {
-        throw new Error("Orders not found for this price")
-      }
-      for (let i = 0; i < price_orders.length; i++) {
-        let order = price_orders[i];
-        if (order?.orderId == orderId && order.userId == userId) {
-          price_orders.splice(i, 1);
-          i--;
-          break;
-        }
-      }
-    }
-    else {
-      if (order.side == Side.Sell) {
-        let price_orders = orderbook.asks.get(order.price);
-        if (!price_orders) {
-          throw new Error("Price not found in the book");
-        }
-        for (let i = 0; i < price_orders.length; i++) {
-          let order = price_orders[i];
-          if (order?.orderId == orderId && order.userId == userId) {
-            price_orders.splice(i, 1);
-            i--;
-            break;
-          }
-        }
-      }
+    if (!orderbook.remove(order)) {
+      throw new Error(order.side === Side.Buy ? "Orders not found for this price" : "Price not found in the book");
     }
     order.status = OrderStatus.Cancelled;
     const event: DeleteOrderEvent = {

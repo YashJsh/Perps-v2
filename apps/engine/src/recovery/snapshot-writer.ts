@@ -1,5 +1,6 @@
-import { EngineEvents, type Balance, type Order, type Orderbook, type Position, type SnapshotCreatedEvent } from "types"
+import { EngineEvents, type Balance, type Order, type Position, type SnapshotCreatedEvent } from "types"
 import type { EngineState } from "../state/engine-state";
+import type { OrderBookSnapshot } from "../engine/order-book";
 import fs from "fs";
 import path from "path";
 
@@ -8,7 +9,7 @@ interface SnapShot {
   last_procccessed_command_id: string,
   snapShotId: string,
   orders: Record<string, Order>,
-  orderbooks: Record<string, Orderbook>,
+  orderbooks: Record<string, OrderBookSnapshot>,
   positions: Record<string, Position>,
   balances: Record<string, Balance>,
   MarkPrices: Record<string, number>,
@@ -34,7 +35,9 @@ const takeSnapshot = (streamId: string, state: EngineState) => {
     snapShotId: snapshotId,
     last_procccessed_command_id: state.lastCommandProcessedId,
     orders: Object.fromEntries(state.orders),
-    orderbooks: Object.fromEntries(state.orderbooks),
+    orderbooks: Object.fromEntries(
+      [...state.orderbooks].map(([symbol, orderBook]) => [symbol, orderBook.toSnapshot()])
+    ),
     positions: Object.fromEntries(state.positions),
     balances: Object.fromEntries(state.balances),
     MarkPrices: Object.fromEntries(state.markPrices),
