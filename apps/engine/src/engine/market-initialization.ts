@@ -3,7 +3,7 @@ import { OrderBook } from "./order-book";
 
 const SUPPORTED_SYMBOLS= [
    "BTC_USD",
-   "SOL_USD" 
+   "SOL_USD"
 ]
 
 export const seedOrderBook = (state: EngineState)=>{
