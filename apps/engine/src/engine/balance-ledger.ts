@@ -1,10 +1,10 @@
 import type { AddBalancePayload, BalanceAddedEvent, HandleResult, AddBalanceResponse } from "types";
 import { EngineEvents } from "types";
-import { BALANCES } from "../store/store";
+import type { EngineState } from "../state/engine-state";
 
-const handleAddBalance = (payload: unknown, streamId: string): HandleResult<AddBalanceResponse> => {
+const handleAddBalance = (payload: unknown, streamId: string, state: EngineState): HandleResult<AddBalanceResponse> => {
   const data = payload as AddBalancePayload;
-  const user = BALANCES.get(data.userId);
+  const user = state.balances.get(data.userId);
 
   if (data.amount <= 0) {
     throw new Error("Deposit must be positive")
@@ -12,11 +12,11 @@ const handleAddBalance = (payload: unknown, streamId: string): HandleResult<AddB
 
   if (!user) {
     console.log("User is not listed yet");
-    let setBal = BALANCES.set(data.userId, {
+    state.balances.set(data.userId, {
       available: data.amount,
       locked: 0
     });
-    let getBal = BALANCES.get(data.userId);
+    let getBal = state.balances.get(data.userId);
     if (!getBal) {
       throw new Error("User not found");
     }
@@ -66,9 +66,10 @@ const handleBalanceChecks = (
   userId: string,
   quantity: number,
   price: number,
-  leverage: number
+  leverage: number,
+  state: EngineState
 ) => {
-  const balance = BALANCES.get(userId);
+  const balance = state.balances.get(userId);
   if (!balance) {
     throw new Error("User balance not found");
   }

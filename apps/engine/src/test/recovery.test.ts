@@ -1,18 +1,34 @@
 import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
-import BTree from "sorted-btree";
-import { EngineRequestOptions, type EngineRequest } from "types";
-import { BALANCES, POSITION, ORDER, ORDERBOOK, MARKPRICE, LASTTRADEDPRICE } from "../store/store";
+import { EngineRequestOptions, Side, type EngineRequest } from "types";
+import { EngineState } from "../state/engine-state";
 import { rehydrateState } from "../recovery/rehydrate";
-import { engineHandlePlease } from "../engine/engine";
+import { PerpsEngine } from "../engine/perps-engine";
 import { loadLatestSnapShot } from "../recovery/loadSnapshot";
 import fs from "fs";
 import path from "path";
 
 // Mock the Redis event publisher stream to verify silent vs live execution
 const mockSendToEngineStream = mock(() => Promise.resolve());
-mock.module("../redis/engine_events", () => ({
-  sendToEngineStream: mockSendToEngineStream,
-}));
+
+let state: EngineState;
+let engine: PerpsEngine;
+let BALANCES: EngineState["balances"];
+let POSITION: EngineState["positions"];
+let ORDER: EngineState["orders"];
+let ORDERBOOK: EngineState["orderbooks"];
+let MARKPRICE: EngineState["markPrices"];
+let LASTTRADEDPRICE: EngineState["lastTradedPrices"];
+
+beforeEach(() => {
+  state = new EngineState();
+  engine = new PerpsEngine(state, mockSendToEngineStream);
+  BALANCES = state.balances;
+  POSITION = state.positions;
+  ORDER = state.orders;
+  ORDERBOOK = state.orderbooks;
+  MARKPRICE = state.markPrices;
+  LASTTRADEDPRICE = state.lastTradedPrices;
+});
 
 describe("State Rehydration", () => {
   beforeEach(() => {
@@ -22,6 +38,7 @@ describe("State Rehydration", () => {
     ORDERBOOK.clear();
     MARKPRICE.clear();
     LASTTRADEDPRICE.clear();
+    state.lastCommandProcessedId = "0-0";
   });
 
   test("rehydrateState correctly reconstructs store from snapshot payload", () => {
@@ -46,7 +63,7 @@ describe("State Rehydration", () => {
       IndexPrice: { "BTC-USD": 49600 }
     };
 
-    rehydrateState(mockSnapshot);
+    rehydrateState(mockSnapshot, state);
 
     // Verify Balances
     expect(BALANCES.get("alice")).toEqual({ available: 1000, locked: 200 });
@@ -60,8 +77,8 @@ describe("State Rehydration", () => {
     // Verify Orderbook Sorted B-Trees
     const book = ORDERBOOK.get("BTC-USD");
     expect(book).toBeDefined();
-    expect(book?.asks.get(51000)).toEqual([{ orderId: "order-ask" }] as any);
-    expect(book?.bids.get(49000)).toEqual([{ orderId: "order-bid" }] as any);
+    expect(book?.ordersAt(Side.Sell, 51000)).toEqual([{ orderId: "order-ask" }] as any);
+    expect(book?.ordersAt(Side.Buy, 49000)).toEqual([{ orderId: "order-bid" }] as any);
 
     // Verify Mark/Index Prices
     expect(MARKPRICE.get("BTC-USD")).toBe(49500);
@@ -84,7 +101,7 @@ describe("Silent Catch-Up Replay Logic", () => {
       payload: { userId: "alice", symbol: "BTC-USD", amount: 500 }
     };
 
-    engineHandlePlease(request, "200-1", { isReplay: true });
+    engine.execute(request, "200-1", { isReplay: true });
 
     // Replay executes state mutations silently
     expect(BALANCES.get("alice")?.available).toBe(1500);
@@ -100,7 +117,7 @@ describe("Silent Catch-Up Replay Logic", () => {
       payload: { userId: "alice", symbol: "BTC-USD", amount: 500 }
     };
 
-    engineHandlePlease(request, "200-2");
+    engine.execute(request, "200-2");
 
     // Live execution mutates state and broadcasts notifications
     expect(BALANCES.get("alice")?.available).toBe(1500);

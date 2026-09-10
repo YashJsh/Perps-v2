@@ -1,32 +1,33 @@
-import type { CreateOrderPayload, Fill, Orderbook, RestingOrder, HandleResult, CreateOrderResponse, OrderAcceptedEvent, TradeExecutedEvent, EngineEvent } from "types";
-import { FILLS, ORDER, ORDERBOOK } from "../store/store";
+import type { CreateOrderPayload, Fill, RestingOrder, HandleResult, CreateOrderResponse, OrderAcceptedEvent, TradeExecutedEvent, EngineEvent } from "types";
+import type { EngineState } from "../state/engine-state";
+import { OrderBook } from "./order-book";
 import { OrderStatus, Side, Type, EngineEvents } from "types";
-import { riskEngine } from "./risk";
-import { handleBalanceChecks } from "./balance";
-import { positionAccounting } from "./position";
+import { riskEngine } from "./risk-checks";
+import { handleBalanceChecks } from "./balance-ledger";
+import { positionAccounting } from "./position-accounting";
 
-export const handleCreateOrder = (payload: unknown, streamId: string) => {
+export const handleCreateOrder = (payload: unknown, streamId: string, state: EngineState) => {
   const data = payload as CreateOrderPayload;
 
-  const risk = riskEngine(data);
+  const risk = riskEngine(data, state);
   if (risk) {
-    handleBalanceChecks(data.userId, data.quantity, data.price, data.leverage);
+    handleBalanceChecks(data.userId, data.quantity, data.price, data.leverage, state);
   };
 
   if (data.side == Side.Buy) {
-    const response = handleBuyOrder(data, streamId);
+    const response = handleBuyOrder(data, streamId, state);
     return response;
   }
   else {
-    const response = handleSellOrder(data, streamId);
+    const response = handleSellOrder(data, streamId, state);
     return response;
   }
 }
 
-export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): HandleResult<CreateOrderResponse> => {
+export const handleBuyOrder = (data: CreateOrderPayload, streamId: string, state: EngineState): HandleResult<CreateOrderResponse> => {
   const event: EngineEvent[] = [];
   const orderId = crypto.randomUUID();
-  ORDER.set(orderId, {
+  state.orders.set(orderId, {
     filledQty: 0,
     price: data.price,
     orderId,
@@ -59,7 +60,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
   event.push(OrderEvent);
 
   //Get orderbook
-  const orderbook = ORDERBOOK.get(data.symbol);
+  const orderbook = state.orderbooks.get(data.symbol);
   if (!orderbook) {
     throw new Error("Orderbook not found : CreateOrder")
   }
@@ -67,7 +68,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
   if (data.type == Type.Limit) {
     let remaining_qty = data.quantity;
 
-    for (const [price, order] of orderbook.asks.entries()) {
+    for (const [price, order] of orderbook.askLevels()) {
       if (price <= data.price) {
         for (let i = 0; i < order.length; i++) {
           let sellingOrder = order[i];
@@ -77,10 +78,10 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
           const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
 
           //Maker fill
-          let buyerFills = FILLS.get(orderId);
+          let buyerFills = state.fills.get(orderId);
           if (!buyerFills) {
-            FILLS.set(orderId, []);
-            buyerFills = FILLS.get(orderId);
+            state.fills.set(orderId, []);
+            buyerFills = state.fills.get(orderId);
           }
           let fill_order: Fill = {
             orderId,
@@ -110,10 +111,10 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
           }
           event.push(FillEvent);
 
-          let sellerFills = FILLS.get(sellingOrder.orderId);
+          let sellerFills = state.fills.get(sellingOrder.orderId);
           if (!sellerFills) {
-            FILLS.set(sellingOrder.orderId, []);
-            sellerFills = FILLS.get(sellingOrder.orderId);
+            state.fills.set(sellingOrder.orderId, []);
+            sellerFills = state.fills.get(sellingOrder.orderId);
           }
           let seller_fill_order: Fill = {
             orderId,
@@ -130,14 +131,14 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
           //Remove the remaining qty;
           remaining_qty -= matchingQty;
 
-          let buyingOrder = ORDER.get(orderId);
+          let buyingOrder = state.orders.get(orderId);
           if (!buyingOrder) {
             throw new Error("Order not found");
           }
           buyingOrder.remainingQty -= matchingQty;
           buyingOrder.filledQty += matchingQty;
 
-          let sellOrder = ORDER.get(sellingOrder.orderId);
+          let sellOrder = state.orders.get(sellingOrder.orderId);
           if (!sellOrder) {
             throw new Error("Order not found");
           }
@@ -147,7 +148,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
           if (sellOrder.remainingQty == 0) {
             //Remove the orderfrom the book;
             sellOrder.status = OrderStatus.Filled;
-            order.splice(i, 1);
+            orderbook.remove(sellOrder);
             i--;
           }
 
@@ -170,7 +171,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
     const filledQty = data.quantity - remaining_qty;
 
     if (remaining_qty != data?.quantity) {
-      positionAccounting(orderId);
+      positionAccounting(orderId, state);
     }
     console.log("Filled qty : ", filledQty);
     console.log("Remaining qty : ", remaining_qty);
@@ -188,7 +189,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
   } else {
     let remaining_qty = data.quantity;
 
-    for (const [price, order] of orderbook.asks.entries()) {
+    for (const [price, order] of orderbook.askLevels()) {
       if (remaining_qty <= 0) {
         break;
       }
@@ -200,10 +201,10 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
         const matchingQty = Math.min(sellingOrder?.remainingQty, remaining_qty);
 
         //Maker fill
-        let buyerFills = FILLS.get(orderId);
+        let buyerFills = state.fills.get(orderId);
         if (!buyerFills) {
-          FILLS.set(orderId, []);
-          buyerFills = FILLS.get(orderId);
+          state.fills.set(orderId, []);
+          buyerFills = state.fills.get(orderId);
         }
         let fill_order: Fill = {
           orderId,
@@ -232,10 +233,10 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
         }
         event.push(FillEvent);
 
-        let sellerFills = FILLS.get(sellingOrder.orderId);
+        let sellerFills = state.fills.get(sellingOrder.orderId);
         if (!sellerFills) {
-          FILLS.set(sellingOrder.orderId, []);
-          sellerFills = FILLS.get(sellingOrder.orderId);
+          state.fills.set(sellingOrder.orderId, []);
+          sellerFills = state.fills.get(sellingOrder.orderId);
         }
         let seller_fill_order: Fill = {
           orderId,
@@ -252,14 +253,14 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
         //Remove the remaining qty;
         remaining_qty -= matchingQty;
 
-        let buyingOrder = ORDER.get(orderId);
+        let buyingOrder = state.orders.get(orderId);
         if (!buyingOrder) {
           throw new Error("Order not found : createOrderResponse");
         }
         buyingOrder.remainingQty -= matchingQty;
         buyingOrder.filledQty += matchingQty;
 
-        let sellOrder = ORDER.get(sellingOrder.orderId);
+        let sellOrder = state.orders.get(sellingOrder.orderId);
         if (!sellOrder) {
           throw new Error("Sell Order not found : createOrderResponse");
         }
@@ -269,7 +270,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
         if (sellOrder.remainingQty == 0) {
           //Remove the orderfrom the book;
           sellOrder.status = OrderStatus.Filled;
-          order.splice(i, 1);
+          orderbook.remove(sellOrder);
           i--;
         }
         if (remaining_qty == 0) {
@@ -281,7 +282,7 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
     if (remaining_qty == data.quantity) {
       throw new Error("No fills found for order");
     }
-    positionAccounting(orderId);
+    positionAccounting(orderId, state);
 
     return {
       response: {
@@ -301,10 +302,10 @@ export const handleBuyOrder = (data: CreateOrderPayload, streamId: string): Hand
   }
 }
 
-const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResult<CreateOrderResponse> => {
+const handleSellOrder = (data: CreateOrderPayload, streamId: string, state: EngineState): HandleResult<CreateOrderResponse> => {
   const event: EngineEvent[] = [];
   const orderId = crypto.randomUUID();
-  ORDER.set(orderId, {
+  state.orders.set(orderId, {
     filledQty: 0,
     price: data.price,
     orderId,
@@ -335,14 +336,14 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
   }
   event.push(OrderEvent);
   //Get orderbook
-  const orderbook = ORDERBOOK.get(data.symbol);
+  const orderbook = state.orderbooks.get(data.symbol);
   if (!orderbook) {
     throw new Error("Orderbook not found");
   }
 
   if (data.type == Type.Limit) {
     let remaining_qty = data.quantity;
-    for (const [price, order] of orderbook.bids.entriesReversed()) {
+    for (const [price, order] of orderbook.bidLevelsReversed()) {
       if (price >= data.price) {
         for (let i = 0; i < order.length; i++) {
           let buyingOrder = order[i];
@@ -352,10 +353,10 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
           const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
 
           //Maker fill
-          let buyerFills = FILLS.get(buyingOrder.orderId);
+          let buyerFills = state.fills.get(buyingOrder.orderId);
           if (!buyerFills) {
-            FILLS.set(buyingOrder.orderId, []);
-            buyerFills = FILLS.get(buyingOrder.orderId);
+            state.fills.set(buyingOrder.orderId, []);
+            buyerFills = state.fills.get(buyingOrder.orderId);
           }
           let fill_order: Fill = {
             orderId,
@@ -384,10 +385,10 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
           }
           event.push(FillEvent);
 
-          let sellerFills = FILLS.get(orderId);
+          let sellerFills = state.fills.get(orderId);
           if (!sellerFills) {
-            FILLS.set(orderId, []);
-            sellerFills = FILLS.get(orderId);
+            state.fills.set(orderId, []);
+            sellerFills = state.fills.get(orderId);
           }
           let seller_fill_order: Fill = {
             orderId,
@@ -404,14 +405,14 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
           //Remove the remaining qty;
           remaining_qty -= matchingQty;
 
-          let buyOrder = ORDER.get(buyingOrder.orderId);
+          let buyOrder = state.orders.get(buyingOrder.orderId);
           if (!buyOrder) {
             throw new Error("Buy order not present");
           }
           buyOrder.remainingQty -= matchingQty;
           buyOrder.filledQty += matchingQty;
 
-          let sellOrder = ORDER.get(orderId);
+          let sellOrder = state.orders.get(orderId);
           if (!sellOrder) {
             throw new Error("Sell order not present");
           }
@@ -421,7 +422,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
           if (buyOrder.remainingQty == 0) {
             //Remove the orderfrom the book;
             buyOrder.status = OrderStatus.Filled;
-            order.splice(i, 1);
+            orderbook.remove(buyOrder);
             i--;
           }
 
@@ -443,7 +444,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
     const filledQty = data.quantity - remaining_qty;
 
     if (remaining_qty != data?.quantity) {
-      positionAccounting(orderId);
+      positionAccounting(orderId, state);
     }
 
     let status: OrderStatus;
@@ -467,7 +468,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
   else {
     let remaining_qty = data.quantity;
 
-    for (const [price, order] of orderbook.bids.entriesReversed()) {
+    for (const [price, order] of orderbook.bidLevelsReversed()) {
       if (remaining_qty <= 0) {
         break;
       }
@@ -479,10 +480,10 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
         const matchingQty = Math.min(buyingOrder?.remainingQty, remaining_qty);
 
         //Maker fill
-        let buyerFills = FILLS.get(buyingOrder.orderId);
+        let buyerFills = state.fills.get(buyingOrder.orderId);
         if (!buyerFills) {
-          FILLS.set(buyingOrder.orderId, []);
-          buyerFills = FILLS.get(buyingOrder.orderId);
+          state.fills.set(buyingOrder.orderId, []);
+          buyerFills = state.fills.get(buyingOrder.orderId);
         }
         let fill_order: Fill = {
           orderId,
@@ -510,10 +511,10 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
           timestamp: Date.now(),
         }
         event.push(FillEvent);
-        let sellerFills = FILLS.get(orderId);
+        let sellerFills = state.fills.get(orderId);
         if (!sellerFills) {
-          FILLS.set(orderId, []);
-          sellerFills = FILLS.get(orderId);
+          state.fills.set(orderId, []);
+          sellerFills = state.fills.get(orderId);
         }
         let seller_fill_order: Fill = {
           orderId,
@@ -531,14 +532,14 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
         //Remove the remaining qty;
         remaining_qty -= matchingQty;
 
-        let buyOrder = ORDER.get(buyingOrder.orderId);
+        let buyOrder = state.orders.get(buyingOrder.orderId);
         if (!buyOrder) {
           throw new Error("Buy order not present");
         }
         buyOrder.remainingQty -= matchingQty;
         buyOrder.filledQty += matchingQty;
 
-        let sellOrder = ORDER.get(orderId);
+        let sellOrder = state.orders.get(orderId);
         if (!sellOrder) {
           throw new Error("Sell order not present");
         }
@@ -548,7 +549,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
         if (buyOrder.remainingQty == 0) {
           //Remove the orderfrom the book;
           buyOrder.status = OrderStatus.Filled;
-          order.splice(i, 1);
+          orderbook.remove(buyOrder);
           i--;
         }
 
@@ -558,14 +559,14 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
 
       }
     }
-    const get_order = ORDER.get(orderId);
+    const get_order = state.orders.get(orderId);
     if (remaining_qty > 0 && remaining_qty < data.quantity) {
       get_order!.status = OrderStatus.PartiallyFilled;
     }
     if (remaining_qty == data.quantity) {
       throw new Error("No fills found for order");
     }
-    positionAccounting(orderId);
+    positionAccounting(orderId, state);
 
     return {
       response: {
@@ -578,7 +579,7 @@ const handleSellOrder = (data: CreateOrderPayload, streamId: string): HandleResu
   }
 }
 
-const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: Orderbook) => {
+const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: OrderBook) => {
   let restingOrder: RestingOrder = {
     orderId: orderId,
     userId: order.userId,
@@ -590,15 +591,11 @@ const addBids = (order: CreateOrderPayload, orderId: string, remaining_qty: numb
     timestamp: Date.now()
   }
 
-  if (!orderbook.bids.has(restingOrder.price)) {
-    orderbook.bids.set(restingOrder.price, [restingOrder]);
-    return;
-  };
-  orderbook.bids.get(restingOrder.price)?.push(restingOrder);
+  orderbook.add(restingOrder);
   return restingOrder;
 }
 
-const addAsks = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: Orderbook) => {
+const addAsks = (order: CreateOrderPayload, orderId: string, remaining_qty: number, orderbook: OrderBook) => {
   let restingOrder: RestingOrder = {
     orderId: orderId,
     userId: order.userId,
@@ -610,9 +607,5 @@ const addAsks = (order: CreateOrderPayload, orderId: string, remaining_qty: numb
     timestamp: Date.now()
   }
 
-  if (!orderbook.asks.has(restingOrder.price)) {
-    orderbook.asks.set(restingOrder.price, [restingOrder]);
-    return;
-  };
-  orderbook.asks.get(restingOrder.price)?.push(restingOrder);
+  orderbook.add(restingOrder);
 }

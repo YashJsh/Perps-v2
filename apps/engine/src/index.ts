@@ -1,11 +1,13 @@
 
 import type { EngineRequest, EngineResponse } from "types";
-import { engineHandlePlease } from "./engine/engine";
-import { senderClient } from "./redis/engine_response";
-import { command_receiver_client } from "./redis/command_reciever";
-import { seedOrderBook } from "./engine/seed";
+import { PerpsEngine } from "./engine/perps-engine";
+import { sendToEngineStream } from "./redis/event-stream";
+import { senderClient } from "./redis/response-stream";
+import { command_receiver_client } from "./redis/request-stream";
+import { seedOrderBook } from "./engine/market-initialization";
 import { loadLatestSnapShot } from "./recovery/loadSnapshot";
 import { rehydrateState } from "./recovery/rehydrate"
+import { EngineState } from "./state/engine-state";
 
 const sendResponse = async (data: unknown) => {
     senderClient.xAdd("engine:responses", "*", {
@@ -14,13 +16,15 @@ const sendResponse = async (data: unknown) => {
 }
 
 const main = async () => {
-    seedOrderBook();
+    const state = new EngineState();
+    const engine = new PerpsEngine(state, sendToEngineStream);
+    seedOrderBook(state);
     let snapShotId = "0-0";
 
     try {
         const snapshot = loadLatestSnapShot();
         if (snapshot) {
-            rehydrateState(snapshot);
+            rehydrateState(snapshot, state);
             snapShotId = snapshot.last_processed_command_id;
             console.log(`Rehydrated state from snapshot at ID: ${snapShotId}`);
         }
@@ -51,7 +55,7 @@ const main = async () => {
             for (const msg of replayMessages) {
                 //@ts-ignore
                 const parsedData = JSON.parse(msg.message.data) as EngineRequest;
-                engineHandlePlease(parsedData, msg.id, { isReplay: true });
+                engine.execute(parsedData, msg.id, { isReplay: true });
                 console.log(`Silently replayed message: ${msg.id}`);
             }
         } catch (error) {
@@ -84,7 +88,7 @@ const main = async () => {
         //@ts-ignore
         const streamId = message[0].messages[0].id;
         try {
-            const response = engineHandlePlease(parsedData, streamId);
+            const response = engine.execute(parsedData, streamId);
             if (!response) {
                 continue;
             }
@@ -103,4 +107,3 @@ const main = async () => {
 };
 
 main();
-

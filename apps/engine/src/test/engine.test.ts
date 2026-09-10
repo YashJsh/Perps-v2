@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import BTree from "sorted-btree";
 import {
   EngineEvents,
   EngineRequestOptions,
@@ -8,48 +7,87 @@ import {
   Type,
   type Fill,
   type Order,
-  type Orderbook,
   type Position,
   type RestingOrder,
   type EngineRequest,
 } from "types";
-import { handleAddBalance } from "../engine/balance";
-import { handleCreateOrder } from "../engine/createOrder";
-import { handleDeleteOrder } from "../engine/deleteOrder";
-import { positionAccounting } from "../engine/position";
-import { riskEngine } from "../engine/risk";
-import { applyFundingRate } from "../engine/fundingRate";
-import { checkLiquidation } from "../engine/liquidation";
-import { handleCurrentPrice } from "../engine/price";
-import {
-  BALANCES,
-  ENGINE_META_DATA,
-  FILLS,
-  LASTTRADEDPRICE,
-  MARKPRICE,
-  ORDER,
-  ORDERBOOK,
-  POSITION,
-} from "../store/store";
-import { takeSnapshot } from "../engine/snapshot";
+import { handleAddBalance as handleAddBalanceWithState } from "../engine/balance-ledger";
+import { handleCreateOrder as handleCreateOrderWithState } from "../engine/order-matching";
+import { handleDeleteOrder as handleDeleteOrderWithState } from "../engine/order-cancellation";
+import { positionAccounting as positionAccountingWithState } from "../engine/position-accounting";
+import { riskEngine as riskEngineWithState } from "../engine/risk-checks";
+import { applyFundingRate as applyFundingRateWithState } from "../engine/funding";
+import { checkLiquidation as checkLiquidationWithState } from "../engine/liquidation";
+import { handleCurrentPrice as handleCurrentPriceWithState } from "../engine/market-prices";
+import { EngineState } from "../state/engine-state";
+import { OrderBook } from "../engine/order-book";
+import { takeSnapshot as takeSnapshotWithState } from "../recovery/snapshot-writer";
 import fs from "fs";
 import path from "path";
 
 const SYMBOL = "BTC-USD";
 const STREAM_ID = "test-stream";
+let testState: EngineState;
+let BALANCES: EngineState["balances"];
+let FILLS: EngineState["fills"];
+let LASTTRADEDPRICE: EngineState["lastTradedPrices"];
+let MARKPRICE: EngineState["markPrices"];
+let ORDER: EngineState["orders"];
+let ORDERBOOK: EngineState["orderbooks"];
+let POSITION: EngineState["positions"];
 
-const createOrderbook = (): Orderbook => ({
-  asks: new BTree<number, RestingOrder[]>(),
-  bids: new BTree<number, RestingOrder[]>(),
-});
+const handleAddBalance = (payload: unknown, streamId: string) =>
+  handleAddBalanceWithState(payload, streamId, testState);
+const handleCreateOrder = (payload: unknown, streamId: string) =>
+  handleCreateOrderWithState(payload, streamId, testState);
+const handleDeleteOrder = (request: EngineRequest, streamId: string) =>
+  handleDeleteOrderWithState(request, streamId, testState);
+const positionAccounting = (orderId: string) =>
+  positionAccountingWithState(orderId, testState);
+const riskEngine = (payload: Parameters<typeof riskEngineWithState>[0]) =>
+  riskEngineWithState(payload, testState);
+const applyFundingRate = (
+  indexPriceData: Map<string, number>,
+  markPriceData: Map<string, number>,
+  streamId: string,
+  data: Parameters<typeof applyFundingRateWithState>[2]
+) => {
+  testState.lastTradedPrices.clear();
+  for (const [symbol, price] of indexPriceData) {
+    testState.lastTradedPrices.set(symbol, price);
+  }
+  testState.markPrices.clear();
+  for (const [symbol, price] of markPriceData) {
+    testState.markPrices.set(symbol, price);
+  }
+  return applyFundingRateWithState(testState, streamId, data);
+};
+const checkLiquidation = (markPrice: number, streamId: string) =>
+  checkLiquidationWithState(markPrice, streamId, testState);
+const handleCurrentPrice = (request: EngineRequest) =>
+  handleCurrentPriceWithState(request, testState);
+const takeSnapshot = (streamId: string) =>
+  takeSnapshotWithState(streamId, testState);
+const ENGINE_META_DATA = {
+  get LAST_COMMAND_PROCESSED_ID() {
+    return testState.lastCommandProcessedId;
+  },
+  set LAST_COMMAND_PROCESSED_ID(value: string) {
+    testState.lastCommandProcessedId = value;
+  },
+};
+
+const createOrderbook = (): OrderBook => new OrderBook();
 
 const resetStore = () => {
-  BALANCES.clear();
-  FILLS.clear();
-  ORDER.clear();
-  ORDERBOOK.clear();
-  POSITION.clear();
-  MARKPRICE.clear();
+  testState = new EngineState();
+  BALANCES = testState.balances;
+  FILLS = testState.fills;
+  LASTTRADEDPRICE = testState.lastTradedPrices;
+  MARKPRICE = testState.markPrices;
+  ORDER = testState.orders;
+  ORDERBOOK = testState.orderbooks;
+  POSITION = testState.positions;
   ORDERBOOK.set(SYMBOL, createOrderbook());
 };
 
@@ -87,7 +125,7 @@ const seedRestingAsk = (overrides: Partial<RestingOrder> = {}) => {
     timestamp: restingOrder.timestamp,
     leverage: 5,
   });
-  ORDERBOOK.get(SYMBOL)?.asks.set(restingOrder.price, [restingOrder]);
+  ORDERBOOK.get(SYMBOL)?.add(restingOrder);
 };
 
 const seedRestingBid = (overrides: Partial<RestingOrder> = {}) => {
@@ -116,7 +154,7 @@ const seedRestingBid = (overrides: Partial<RestingOrder> = {}) => {
     timestamp: restingOrder.timestamp,
     leverage: 5,
   });
-  ORDERBOOK.get(SYMBOL)?.bids.set(restingOrder.price, [restingOrder]);
+  ORDERBOOK.get(SYMBOL)?.add(restingOrder);
 };
 
 beforeEach(() => {
@@ -192,7 +230,7 @@ describe("limit order creation and matching", () => {
 
     const buyerOrder = [...ORDER.values()].find((o) => o.userId === "buyer");
     expect(buyerOrder?.status).toBe(OrderStatus.Open);
-    expect(ORDERBOOK.get(SYMBOL)?.bids.get(100)?.length).toBe(1);
+     expect(ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100)?.length).toBe(1);
   });
 
   test("fully matched crossing buy is marked as filled", () => {
@@ -247,7 +285,7 @@ describe("limit order creation and matching", () => {
       size: 2,
       averageEntryPrice: 100,
     });
-    expect(ORDERBOOK.get(SYMBOL)?.asks.get(100)?.length ?? 0).toBe(0);
+     expect(ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Sell, 100)?.length ?? 0).toBe(0);
   });
 
   test("matches an incoming sell against the highest bid first", () => {
@@ -294,7 +332,7 @@ describe("limit order creation and matching", () => {
 
     const buyerOrder = [...ORDER.values()].find((o) => o.userId === "buyer");
     const restingBid = buyerOrder
-      ? ORDERBOOK.get(SYMBOL)?.bids.get(105)?.find((r) => r.orderId === buyerOrder.orderId)
+       ? ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 105)?.find((r) => r.orderId === buyerOrder.orderId)
       : undefined;
 
     expect(result.response.filledQty).toBe(1);
@@ -350,7 +388,7 @@ describe("limit order creation and matching", () => {
 
     const sellerOrder = [...ORDER.values()].find((o) => o.userId === "seller");
     const restingAsk = sellerOrder
-      ? ORDERBOOK.get(SYMBOL)?.asks.get(100)?.find((r) => r.orderId === sellerOrder.orderId)
+       ? ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Sell, 100)?.find((r) => r.orderId === sellerOrder.orderId)
       : undefined;
 
     expect(result.response.filledQty).toBe(1);
@@ -469,7 +507,7 @@ describe("order cancellation", () => {
 
     expect(result.response.success).toBe(true);
     expect(order.status).toBe(OrderStatus.Cancelled);
-    expect(ORDERBOOK.get(SYMBOL)?.bids.get(100)?.length ?? 0).toBe(0);
+     expect(ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100)?.length ?? 0).toBe(0);
   });
 
   test("rejects cancellation of an already filled order", () => {
@@ -1305,7 +1343,7 @@ describe("edge cases", () => {
       STREAM_ID,
     );
 
-    const bidsAt100 = ORDERBOOK.get(SYMBOL)?.bids.get(100);
+     const bidsAt100 = ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100);
     expect(bidsAt100).toHaveLength(2);
     expect(bidsAt100?.[0]?.userId).toBe("buyer1");
     expect(bidsAt100?.[1]?.userId).toBe("buyer2");
@@ -1333,7 +1371,7 @@ describe("edge cases", () => {
       STREAM_ID,
     );
 
-    const bidsAt100 = ORDERBOOK.get(SYMBOL)?.bids.get(100);
+     const bidsAt100 = ORDERBOOK.get(SYMBOL)?.ordersAt(Side.Buy, 100);
     expect(bidsAt100).toHaveLength(1);
     expect(bidsAt100?.[0]?.userId).toBe("buyer2");
   });
